@@ -64,19 +64,33 @@ export const getMessages = query({
             .order("asc")
             .collect();
 
-        // Map sender info
-        const messagesWithSender = await Promise.all(
+        // Map sender info and reactions
+        const messagesWithDetails = await Promise.all(
             messages.map(async (msg: any) => {
                 const sender = (await ctx.db.get(msg.senderId)) as any;
+
+                const rawReactions = await ctx.db
+                    .query("reactions")
+                    .withIndex("by_messageId", (q: any) => q.eq("messageId", msg._id))
+                    .collect();
+
+                // Group by emoji
+                const reactions = rawReactions.reduce((acc: any, r: any) => {
+                    if (!acc[r.reaction]) acc[r.reaction] = [];
+                    acc[r.reaction].push(r.userId);
+                    return acc;
+                }, {});
+
                 return {
                     ...msg,
                     sender: sender ? { name: sender.name, imageUrl: sender.imageUrl, isOnline: sender.isOnline } : null,
                     isMine: msg.senderId === user._id,
+                    reactions,
                 };
             })
         );
 
-        return messagesWithSender;
+        return messagesWithDetails;
     },
 });
 

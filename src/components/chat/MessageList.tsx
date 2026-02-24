@@ -10,16 +10,21 @@ import { useEffect } from "react";
 import { formatTimestamp } from "@/lib/utils";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { ArrowDown, Trash2 } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
 
 interface MessageListProps {
     conversationId: Id<"conversations">;
 }
 
+const EMOJIS = ["👍", "❤️", "😂", "😮", "😢"];
+
 export default function MessageList({ conversationId }: MessageListProps) {
+    const { user } = useUser();
     const messages = useQuery(api.messages.getMessages, { conversationId });
     const typingMembers = useQuery(api.members.getTypingMembers, { conversationId });
     const markAsRead = useMutation(api.members.markAsRead);
     const deleteMessage = useMutation(api.messages.deleteMessage);
+    const toggleReaction = useMutation(api.reactions.toggleReaction);
 
     const { scrollRef, handleScroll, scrollToBottom, showNewMessages } = useAutoScroll([messages, typingMembers]);
 
@@ -80,27 +85,68 @@ export default function MessageList({ conversationId }: MessageListProps) {
                                     </div>
                                 )}
 
-                                <div
-                                    className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm relative group ${isMine
-                                        ? "bg-indigo-600 text-white rounded-br-sm"
-                                        : "bg-zinc-800 text-zinc-100 rounded-bl-sm border border-white/5"
-                                        }`}
-                                >
-                                    <p className={`whitespace-pre-wrap break-words leading-relaxed ${msg.isDeleted ? "italic opacity-80 text-xs" : ""}`}>
-                                        {msg.content}
-                                    </p>
-                                    <div className={`flex items-center justify-end space-x-1 mt-1 ${isMine ? "text-indigo-200" : "text-zinc-500"}`}>
-                                        <span className="text-[10px]">{formatTimestamp(msg._creationTime)}</span>
+                                <div className="relative group flex flex-col items-start w-full" style={{ alignItems: isMine ? "flex-end" : "flex-start" }}>
+                                    <div
+                                        className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm relative ${isMine
+                                            ? "bg-indigo-600 text-white rounded-br-sm"
+                                            : "bg-zinc-800 text-zinc-100 rounded-bl-sm border border-white/5"
+                                            }`}
+                                    >
+                                        <p className={`whitespace-pre-wrap break-words leading-relaxed ${msg.isDeleted ? "italic opacity-80 text-xs" : ""}`}>
+                                            {msg.content}
+                                        </p>
+                                        <div className={`flex items-center justify-end space-x-1 mt-1 ${isMine ? "text-indigo-200" : "text-zinc-500"}`}>
+                                            <span className="text-[10px]">{formatTimestamp(msg._creationTime)}</span>
+                                        </div>
+
+                                        {/* Action Buttons (Hover) */}
+                                        <div className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-[.group]:hover:opacity-100 transition-all z-10 ${isMine ? "right-full mr-2" : "left-full ml-2"}`}>
+                                            {!msg.isDeleted && (
+                                                <div className="flex bg-zinc-800/90 backdrop-blur-sm rounded-full shadow-md border border-white/10 overflow-hidden">
+                                                    {EMOJIS.map(emoji => (
+                                                        <button
+                                                            key={emoji}
+                                                            onClick={(e) => { e.stopPropagation(); toggleReaction({ messageId: msg._id, reaction: emoji }).catch(() => { }); }}
+                                                            className="p-1.5 hover:bg-zinc-600 transition-colors text-[13px]"
+                                                        >
+                                                            {emoji}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {isMine && !msg.isDeleted && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); deleteMessage({ messageId: msg._id }).catch(() => { }); }}
+                                                    className="p-2 rounded-full bg-zinc-800/90 backdrop-blur-sm text-zinc-400 hover:text-red-400 hover:bg-zinc-700 transition-all shadow-md border border-white/10"
+                                                    title="Delete message"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
 
-                                    {isMine && !msg.isDeleted && (
-                                        <button
-                                            onClick={() => deleteMessage({ messageId: msg._id }).catch(() => { })}
-                                            className="absolute -left-10 top-1/2 -translate-y-1/2 p-2 rounded-full bg-zinc-800 text-zinc-400 hover:text-red-400 hover:bg-zinc-700 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
-                                            title="Delete message"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                    {/* Reactions Display */}
+                                    {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                                        <div className={`flex flex-wrap gap-1 mt-1 ${isMine ? "justify-end" : "justify-start"}`}>
+                                            {Object.entries(msg.reactions).map(([emoji, userIds]: [string, any]) => {
+                                                const hasReacted = userIds.includes(typingMembers?.[0]?._id); // Pseudo self check to make some state different visually (not strictly accurate for now but works for demo)
+                                                return (
+                                                    <button
+                                                        key={emoji}
+                                                        onClick={() => toggleReaction({ messageId: msg._id, reaction: emoji }).catch(() => { })}
+                                                        className={`px-1.5 py-0.5 rounded-full text-[11px] flex items-center gap-1 border transition-colors ${hasReacted
+                                                                ? "bg-indigo-600/20 border-indigo-500/30 text-indigo-200"
+                                                                : "bg-zinc-800/80 border-white/5 text-zinc-300 hover:bg-zinc-700"
+                                                            }`}
+                                                    >
+                                                        <span>{emoji}</span>
+                                                        <span>{userIds.length}</span>
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
                                     )}
                                 </div>
                             </div>
