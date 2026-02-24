@@ -5,6 +5,7 @@ import { SendHorizontal } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
+import { toast } from "sonner";
 
 interface MessageInputProps {
     conversationId: Id<"conversations">;
@@ -39,6 +40,7 @@ export default function MessageInput({ conversationId }: MessageInputProps) {
             await sendMessage({ conversationId, content: text });
         } catch (error) {
             console.error("Failed to send message", error);
+            toast.error("Failed to send message. Please try again.");
             setContent(text); // Revert back the input if failed
         } finally {
             setIsSending(false);
