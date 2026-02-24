@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect } from "react";
 import { formatTimestamp } from "@/lib/utils";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, Trash2 } from "lucide-react";
 
 interface MessageListProps {
     conversationId: Id<"conversations">;
@@ -19,6 +19,7 @@ export default function MessageList({ conversationId }: MessageListProps) {
     const messages = useQuery(api.messages.getMessages, { conversationId });
     const typingMembers = useQuery(api.members.getTypingMembers, { conversationId });
     const markAsRead = useMutation(api.members.markAsRead);
+    const deleteMessage = useMutation(api.messages.deleteMessage);
 
     const { scrollRef, handleScroll, scrollToBottom, showNewMessages } = useAutoScroll([messages, typingMembers]);
 
@@ -80,15 +81,27 @@ export default function MessageList({ conversationId }: MessageListProps) {
                                 )}
 
                                 <div
-                                    className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm ${isMine
+                                    className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm relative group ${isMine
                                         ? "bg-indigo-600 text-white rounded-br-sm"
                                         : "bg-zinc-800 text-zinc-100 rounded-bl-sm border border-white/5"
                                         }`}
                                 >
-                                    <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+                                    <p className={`whitespace-pre-wrap break-words leading-relaxed ${msg.isDeleted ? "italic opacity-80 text-xs" : ""}`}>
+                                        {msg.content}
+                                    </p>
                                     <div className={`flex items-center justify-end space-x-1 mt-1 ${isMine ? "text-indigo-200" : "text-zinc-500"}`}>
                                         <span className="text-[10px]">{formatTimestamp(msg._creationTime)}</span>
                                     </div>
+
+                                    {isMine && !msg.isDeleted && (
+                                        <button
+                                            onClick={() => deleteMessage({ messageId: msg._id }).catch(() => { })}
+                                            className="absolute -left-10 top-1/2 -translate-y-1/2 p-2 rounded-full bg-zinc-800 text-zinc-400 hover:text-red-400 hover:bg-zinc-700 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                                            title="Delete message"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         );

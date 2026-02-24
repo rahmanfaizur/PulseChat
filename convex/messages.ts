@@ -67,7 +67,7 @@ export const getMessages = query({
         // Map sender info
         const messagesWithSender = await Promise.all(
             messages.map(async (msg: any) => {
-                const sender = await ctx.db.get(msg.senderId);
+                const sender = (await ctx.db.get(msg.senderId)) as any;
                 return {
                     ...msg,
                     sender: sender ? { name: sender.name, imageUrl: sender.imageUrl, isOnline: sender.isOnline } : null,
@@ -77,5 +77,34 @@ export const getMessages = query({
         );
 
         return messagesWithSender;
+    },
+});
+
+export const deleteMessage = mutation({
+    args: {
+        messageId: v.id("messages"),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthorized");
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q: any) => q.eq("clerkId", identity.subject))
+            .unique();
+
+        if (!user) throw new Error("User not found");
+
+        const message = await ctx.db.get(args.messageId);
+        if (!message) throw new Error("Message not found");
+
+        if (message.senderId !== user._id) {
+            throw new Error("Can only delete your own messages");
+        }
+
+        await ctx.db.patch(args.messageId, {
+            isDeleted: true,
+            content: "This message was deleted",
+        });
     },
 });
