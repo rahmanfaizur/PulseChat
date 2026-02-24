@@ -6,8 +6,10 @@ import { Id } from "../../../convex/_generated/dataModel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { formatTimestamp } from "@/lib/utils";
+import { useAutoScroll } from "@/hooks/useAutoScroll";
+import { ArrowDown } from "lucide-react";
 
 interface MessageListProps {
     conversationId: Id<"conversations">;
@@ -17,14 +19,11 @@ export default function MessageList({ conversationId }: MessageListProps) {
     const messages = useQuery(api.messages.getMessages, { conversationId });
     const typingMembers = useQuery(api.members.getTypingMembers, { conversationId });
     const markAsRead = useMutation(api.members.markAsRead);
-    const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Auto scroll to bottom
+    const { scrollRef, handleScroll, scrollToBottom, showNewMessages } = useAutoScroll([messages, typingMembers]);
+
+    // Mark as read effect
     useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollIntoView({ behavior: "smooth" });
-        }
-
         if (messages && messages.length > 0) {
             const lastMessage = messages[messages.length - 1];
             markAsRead({ conversationId, messageId: lastMessage._id }).catch(() => { });
@@ -58,62 +57,72 @@ export default function MessageList({ conversationId }: MessageListProps) {
     }
 
     return (
-        <ScrollArea className="flex-1 p-4">
-            <div className="max-w-4xl mx-auto space-y-6 pb-2">
-                {messages.map((msg: any, index: number) => {
-                    const isMine = msg.isMine;
-                    const showAvatar = !isMine && (index === messages.length - 1 || messages[index + 1]?.senderId !== msg.senderId);
+        <div className="flex-1 flex flex-col overflow-hidden relative">
+            <ScrollArea className="flex-1 p-4" viewportRef={scrollRef} onScroll={handleScroll}>
+                <div className="max-w-4xl mx-auto space-y-6 pb-2">
+                    {messages.map((msg: any, index: number) => {
+                        const isMine = msg.isMine;
+                        const showAvatar = !isMine && (index === messages.length - 1 || messages[index + 1]?.senderId !== msg.senderId);
 
-                    return (
-                        <div key={msg._id} className={`flex items-end space-x-2 ${isMine ? "justify-end" : "justify-start"}`}>
-                            {!isMine && (
-                                <div className="w-8 shrink-0">
-                                    {showAvatar && (
-                                        <Avatar className="h-8 w-8 border border-zinc-800">
-                                            <AvatarImage src={msg.sender?.imageUrl} alt={msg.sender?.name || ""} />
-                                            <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
-                                                {msg.sender?.name?.charAt(0) || "U"}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                    )}
-                                </div>
-                            )}
+                        return (
+                            <div key={msg._id} className={`flex items-end space-x-2 ${isMine ? "justify-end" : "justify-start"}`}>
+                                {!isMine && (
+                                    <div className="w-8 shrink-0">
+                                        {showAvatar && (
+                                            <Avatar className="h-8 w-8 border border-zinc-800">
+                                                <AvatarImage src={msg.sender?.imageUrl} alt={msg.sender?.name || ""} />
+                                                <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
+                                                    {msg.sender?.name?.charAt(0) || "U"}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                        )}
+                                    </div>
+                                )}
 
-                            <div
-                                className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm ${isMine
-                                    ? "bg-indigo-600 text-white rounded-br-sm"
-                                    : "bg-zinc-800 text-zinc-100 rounded-bl-sm border border-white/5"
-                                    }`}
-                            >
-                                <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
-                                <div className={`flex items-center justify-end space-x-1 mt-1 ${isMine ? "text-indigo-200" : "text-zinc-500"}`}>
-                                    <span className="text-[10px]">{formatTimestamp(msg._creationTime)}</span>
+                                <div
+                                    className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm ${isMine
+                                        ? "bg-indigo-600 text-white rounded-br-sm"
+                                        : "bg-zinc-800 text-zinc-100 rounded-bl-sm border border-white/5"
+                                        }`}
+                                >
+                                    <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+                                    <div className={`flex items-center justify-end space-x-1 mt-1 ${isMine ? "text-indigo-200" : "text-zinc-500"}`}>
+                                        <span className="text-[10px]">{formatTimestamp(msg._creationTime)}</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    );
-                })}
+                        );
+                    })}
 
-                {typingMembers && typingMembers.length > 0 && (
-                    <div className="flex items-end space-x-2 justify-start">
-                        <div className="w-8 shrink-0">
-                            <Avatar className="h-8 w-8 border border-zinc-800">
-                                <AvatarImage src={(typingMembers[0] as any)?.imageUrl} />
-                                <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
-                                    {(typingMembers[0] as any)?.name?.charAt(0) || "U"}
-                                </AvatarFallback>
-                            </Avatar>
+                    {typingMembers && typingMembers.length > 0 && (
+                        <div className="flex items-end space-x-2 justify-start">
+                            <div className="w-8 shrink-0">
+                                <Avatar className="h-8 w-8 border border-zinc-800">
+                                    <AvatarImage src={(typingMembers[0] as any)?.imageUrl} />
+                                    <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
+                                        {(typingMembers[0] as any)?.name?.charAt(0) || "U"}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </div>
+                            <div className="bg-zinc-800 border border-white/5 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center space-x-1 shadow-sm">
+                                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
+                            </div>
                         </div>
-                        <div className="bg-zinc-800 border border-white/5 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center space-x-1 shadow-sm">
-                            <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                            <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                            <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
-                        </div>
-                    </div>
-                )}
+                    )}
+                </div>
+            </ScrollArea>
 
-                <div ref={scrollRef} className="h-1" />
-            </div>
-        </ScrollArea>
+            {showNewMessages && (
+                <button
+                    onClick={scrollToBottom}
+                    className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-zinc-800 border border-white/10 hover:bg-zinc-700 text-white rounded-full px-4 py-2 text-xs font-medium shadow-lg flex items-center gap-1.5 transition-all animate-in fade-in slide-in-from-bottom-2 z-10"
+                >
+                    <ArrowDown className="w-3.5 h-3.5" />
+                    New messages
+                </button>
+            )}
+        </div>
     );
 }
