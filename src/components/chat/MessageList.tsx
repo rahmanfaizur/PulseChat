@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useRef } from "react";
+import { formatTimestamp } from "@/lib/utils";
 
 interface MessageListProps {
     conversationId: Id<"conversations">;
@@ -72,13 +73,16 @@ export default function MessageList({ conversationId }: MessageListProps) {
                             )}
 
                             <div
-                                className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${isMine
+                                className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm ${isMine
                                     ? "bg-indigo-600 text-white rounded-br-sm"
                                     : "bg-zinc-800 text-zinc-100 rounded-bl-sm border border-white/5"
                                     }`}
                             >
-                                <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                                {/* Future: Timestamps and Reactions go here */}
+                                <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+                                <div className={`flex items-center justify-end space-x-1 mt-1 ${isMine ? "text-indigo-200" : "text-zinc-500"}`}>
+                                    <span className="text-[10px]">{formatTimestamp(msg._creationTime)}</span>
+                                </div>
+                                {/* Future: Reactions go here */}
                             </div>
                         </div>
                     );
