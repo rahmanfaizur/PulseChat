@@ -1,28 +1,31 @@
 "use client";
 
-import { Authenticated, Unauthenticated } from "convex/react";
+import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { Loader2 } from "lucide-react";
 
 export default function AuthProtectedRoute({ children }: { children: React.ReactNode }) {
+    const { isLoaded, userId } = useAuth();
     const router = useRouter();
 
-    return (
-        <>
-            <Authenticated>
-                {children}
-            </Authenticated>
-            <Unauthenticated>
-                <RedirectToSignIn router={router} />
-            </Unauthenticated>
-        </>
-    );
-}
-
-function RedirectToSignIn({ router }: { router: any }) {
     useEffect(() => {
-        router.push("/sign-in");
-    }, [router]);
+        if (isLoaded && !userId) {
+            router.push("/sign-in");
+        }
+    }, [isLoaded, userId, router]);
 
-    return null;
+    if (!isLoaded) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-zinc-950 text-indigo-500">
+                <Loader2 className="w-8 h-8 animate-spin" />
+            </div>
+        );
+    }
+
+    if (!userId) {
+        return null;
+    }
+
+    return <>{children}</>;
 }
