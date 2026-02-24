@@ -97,9 +97,16 @@ export default function ConversationList({ searchQuery }: { searchQuery: string 
                                     <p className={`text-sm font-medium truncate ${isActive ? "text-indigo-400" : "text-zinc-100"}`}>
                                         {title}
                                     </p>
-                                    <span className="text-[10px] text-zinc-500 shrink-0 ml-2">{timeString}</span>
+                                    <div className="flex items-center space-x-1 shrink-0 ml-2">
+                                        {c.unreadCount > 0 && !isActive && (
+                                            <span className="bg-indigo-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] flex items-center justify-center">
+                                                {c.unreadCount > 99 ? "99+" : c.unreadCount}
+                                            </span>
+                                        )}
+                                        <span className="text-[10px] text-zinc-500">{timeString}</span>
+                                    </div>
                                 </div>
-                                <p className="text-xs text-zinc-500 truncate block">
+                                <p className={`text-xs truncate block ${c.unreadCount > 0 && !isActive ? "text-zinc-300 font-medium" : "text-zinc-500"}`}>
                                     {lastMessagePreview}
                                 </p>
                             </div>

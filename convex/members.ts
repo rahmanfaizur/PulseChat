@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 
 export const setTyping = mutation({
     args: {
@@ -63,5 +64,36 @@ export const getTypingMembers = query({
         );
 
         return users.filter((u: any) => u !== null);
+    },
+});
+
+export const markAsRead = mutation({
+    args: {
+        conversationId: v.id("conversations"),
+        messageId: v.id("messages"),
+    },
+    handler: async (ctx: MutationCtx, args: { conversationId: string; messageId: string }) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthorized");
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q: any) => q.eq("clerkId", identity.subject))
+            .unique();
+
+        if (!user) throw new Error("User not found");
+
+        const membership = await ctx.db
+            .query("conversationMembers")
+            .withIndex("by_conversationId_userId", (q: any) =>
+                q.eq("conversationId", args.conversationId).eq("userId", user._id)
+            )
+            .unique();
+
+        if (!membership) throw new Error("Not a member of this conversation");
+
+        await ctx.db.patch(membership._id, {
+            lastReadMessageId: args.messageId as Id<"messages">,
+        });
     },
 });

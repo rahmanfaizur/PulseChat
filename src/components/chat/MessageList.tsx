@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,6 +16,7 @@ interface MessageListProps {
 export default function MessageList({ conversationId }: MessageListProps) {
     const messages = useQuery(api.messages.getMessages, { conversationId });
     const typingMembers = useQuery(api.members.getTypingMembers, { conversationId });
+    const markAsRead = useMutation(api.members.markAsRead);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Auto scroll to bottom
@@ -23,7 +24,12 @@ export default function MessageList({ conversationId }: MessageListProps) {
         if (scrollRef.current) {
             scrollRef.current.scrollIntoView({ behavior: "smooth" });
         }
-    }, [messages, typingMembers]);
+
+        if (messages && messages.length > 0) {
+            const lastMessage = messages[messages.length - 1];
+            markAsRead({ conversationId, messageId: lastMessage._id }).catch(() => { });
+        }
+    }, [messages, typingMembers, conversationId, markAsRead]);
 
     if (messages === undefined) {
         return (

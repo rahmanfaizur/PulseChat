@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 
 export const getOrCreateConversation = mutation({
     args: {
@@ -104,10 +105,30 @@ export const getMyConversations = query({
                     .order("desc")
                     .first();
 
+                let unreadCount = 0;
+                if (membership.lastReadMessageId) {
+                    const lastRead = await ctx.db.get(membership.lastReadMessageId as Id<"messages">);
+                    if (lastRead) {
+                        const unread = await ctx.db
+                            .query("messages")
+                            .withIndex("by_conversationId", (q: any) => q.eq("conversationId", conversation._id))
+                            .filter((q: any) => q.gt(q.field("_creationTime"), lastRead._creationTime))
+                            .collect();
+                        unreadCount = unread.length;
+                    }
+                } else {
+                    const allMsgs = await ctx.db
+                        .query("messages")
+                        .withIndex("by_conversationId", (q: any) => q.eq("conversationId", conversation._id))
+                        .collect();
+                    unreadCount = allMsgs.length;
+                }
+
                 return {
                     ...conversation,
                     otherMembers: otherMembers.filter((m: any) => m !== null),
                     lastMessage,
+                    unreadCount,
                 };
             })
         );
