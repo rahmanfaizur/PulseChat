@@ -11,7 +11,7 @@ export default function Sidebar() {
     const isSearching = searchQuery.trim().length > 0;
 
     return (
-        <aside className="w-80 border-r border-white/10 bg-zinc-950/50 flex flex-col h-full shrink-0">
+        <aside className="w-full bg-zinc-950/50 flex flex-col h-full shrink-0">
             <div className="p-4 border-b border-white/5 bg-zinc-900/50 backdrop-blur-md shrink-0">
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
