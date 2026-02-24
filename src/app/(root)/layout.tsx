@@ -1,6 +1,6 @@
 import { UserButton } from "@clerk/nextjs";
 import UserSync from "@/components/shared/UserSync";
-import Sidebar from "@/components/shared/Sidebar";
+import Sidebar from "@/components/sidebar/Sidebar";
 
 export default function RootAppLayout({ children }: { children: React.ReactNode }) {
     return (

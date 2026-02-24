@@ -1,0 +1,81 @@
+import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
+
+export const sendMessage = mutation({
+    args: {
+        conversationId: v.id("conversations"),
+        content: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthorized");
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+            .unique();
+
+        if (!user) throw new Error("User not found");
+
+        // Verify membership
+        const membership = await ctx.db
+            .query("conversationMembers")
+            .withIndex("by_conversationId_userId", (q) =>
+                q.eq("conversationId", args.conversationId).eq("userId", user._id)
+            )
+            .unique();
+
+        if (!membership) throw new Error("Not a member of this conversation");
+
+        const messageId = await ctx.db.insert("messages", {
+            conversationId: args.conversationId,
+            senderId: user._id,
+            content: args.content,
+            isDeleted: false,
+        });
+
+        // Automatically mark as read for sender
+        await ctx.db.patch(membership._id, {
+            lastReadMessageId: messageId,
+        });
+
+        return messageId;
+    },
+});
+
+export const getMessages = query({
+    args: {
+        conversationId: v.id("conversations"),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) return [];
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q: any) => q.eq("clerkId", identity.subject))
+            .unique();
+
+        if (!user) return [];
+
+        const messages = await ctx.db
+            .query("messages")
+            .withIndex("by_conversationId", (q: any) => q.eq("conversationId", args.conversationId))
+            .order("asc")
+            .collect();
+
+        // Map sender info
+        const messagesWithSender = await Promise.all(
+            messages.map(async (msg: any) => {
+                const sender = await ctx.db.get(msg.senderId);
+                return {
+                    ...msg,
+                    sender: sender ? { name: sender.name, imageUrl: sender.imageUrl, isOnline: sender.isOnline } : null,
+                    isMine: msg.senderId === user._id,
+                };
+            })
+        );
+
+        return messagesWithSender;
+    },
+});
