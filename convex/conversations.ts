@@ -85,11 +85,17 @@ export const getMyConversations = query({
                     .withIndex("by_conversationId", (q: any) => q.eq("conversationId", conversation._id))
                     .collect();
 
-                const otherMembers = await Promise.all(
+                const otherMembersRaw = await Promise.all(
                     otherMemberships
                         .filter((m: any) => m.userId !== user._id)
                         .map(async (m: any) => await ctx.db.get(m.userId))
                 );
+
+                const threshold = Date.now() - 60000;
+                const otherMembers = otherMembersRaw.map((m: any) => m ? {
+                    ...m,
+                    isOnline: m.isOnline && m.lastSeen > threshold
+                } : null);
 
                 // Get last message
                 const lastMessage = await ctx.db
