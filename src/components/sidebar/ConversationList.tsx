@@ -94,9 +94,16 @@ export default function ConversationList({ searchQuery }: { searchQuery: string 
                             </div>
                             <div className="flex-1 overflow-hidden">
                                 <div className="flex justify-between items-baseline mb-0.5">
-                                    <p className={`text-sm font-medium truncate ${isActive ? "text-indigo-400" : "text-zinc-100"}`}>
-                                        {title}
-                                    </p>
+                                    <div className="flex items-center gap-1.5 truncate">
+                                        <p className={`text-sm font-medium truncate ${isActive ? "text-indigo-400" : "text-zinc-100"}`}>
+                                            {title}
+                                        </p>
+                                        {c.isGroup && (
+                                            <span className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-md self-center mt-0.5 whitespace-nowrap">
+                                                {c.otherMembers.length + 1} members
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="flex items-center space-x-1 shrink-0 ml-2">
                                         {c.unreadCount > 0 && !isActive && (
                                             <span className="bg-indigo-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] flex items-center justify-center">

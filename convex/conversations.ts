@@ -142,3 +142,39 @@ export const getMyConversations = query({
             });
     },
 });
+
+export const createGroup = mutation({
+    args: {
+        name: v.string(),
+        memberIds: v.array(v.id("users")),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthorized");
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q: any) => q.eq("clerkId", identity.subject))
+            .unique();
+
+        if (!user) throw new Error("User not found");
+
+        const allMemberIds = [...args.memberIds, user._id];
+
+        const conversationId = await ctx.db.insert("conversations", {
+            isGroup: true,
+            name: args.name,
+        });
+
+        await Promise.all(
+            allMemberIds.map((userId) =>
+                ctx.db.insert("conversationMembers", {
+                    conversationId,
+                    userId,
+                })
+            )
+        );
+
+        return conversationId;
+    },
+});
