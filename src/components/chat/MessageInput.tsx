@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { SendHorizontal } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -13,7 +13,19 @@ interface MessageInputProps {
 export default function MessageInput({ conversationId }: MessageInputProps) {
     const [content, setContent] = useState("");
     const sendMessage = useMutation(api.messages.sendMessage);
+    const setTyping = useMutation(api.members.setTyping);
     const [isSending, setIsSending] = useState(false);
+
+    const lastTyped = useRef(0);
+
+    const handleTyping = (val: string) => {
+        setContent(val);
+        const now = Date.now();
+        if (now - lastTyped.current > 1500) {
+            lastTyped.current = now;
+            setTyping({ conversationId }).catch(() => { });
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -40,7 +52,7 @@ export default function MessageInput({ conversationId }: MessageInputProps) {
                     <input
                         type="text"
                         value={content}
-                        onChange={(e) => setContent(e.target.value)}
+                        onChange={(e) => handleTyping(e.target.value)}
                         disabled={isSending}
                         placeholder="Type a message..."
                         className="w-full bg-zinc-900 border border-zinc-800 rounded-full py-3 pl-4 pr-12 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 transition-all"

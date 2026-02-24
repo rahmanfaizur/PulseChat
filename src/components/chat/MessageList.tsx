@@ -15,6 +15,7 @@ interface MessageListProps {
 
 export default function MessageList({ conversationId }: MessageListProps) {
     const messages = useQuery(api.messages.getMessages, { conversationId });
+    const typingMembers = useQuery(api.members.getTypingMembers, { conversationId });
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Auto scroll to bottom
@@ -22,7 +23,7 @@ export default function MessageList({ conversationId }: MessageListProps) {
         if (scrollRef.current) {
             scrollRef.current.scrollIntoView({ behavior: "smooth" });
         }
-    }, [messages]);
+    }, [messages, typingMembers]);
 
     if (messages === undefined) {
         return (
@@ -82,11 +83,29 @@ export default function MessageList({ conversationId }: MessageListProps) {
                                 <div className={`flex items-center justify-end space-x-1 mt-1 ${isMine ? "text-indigo-200" : "text-zinc-500"}`}>
                                     <span className="text-[10px]">{formatTimestamp(msg._creationTime)}</span>
                                 </div>
-                                {/* Future: Reactions go here */}
                             </div>
                         </div>
                     );
                 })}
+
+                {typingMembers && typingMembers.length > 0 && (
+                    <div className="flex items-end space-x-2 justify-start">
+                        <div className="w-8 shrink-0">
+                            <Avatar className="h-8 w-8 border border-zinc-800">
+                                <AvatarImage src={(typingMembers[0] as any)?.imageUrl} />
+                                <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
+                                    {(typingMembers[0] as any)?.name?.charAt(0) || "U"}
+                                </AvatarFallback>
+                            </Avatar>
+                        </div>
+                        <div className="bg-zinc-800 border border-white/5 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center space-x-1 shadow-sm">
+                            <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                            <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                            <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
+                        </div>
+                    </div>
+                )}
+
                 <div ref={scrollRef} className="h-1" />
             </div>
         </ScrollArea>

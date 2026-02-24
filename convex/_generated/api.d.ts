@@ -9,6 +9,7 @@
  */
 
 import type * as conversations from "../conversations.js";
+import type * as members from "../members.js";
 import type * as messages from "../messages.js";
 import type * as users from "../users.js";
 
@@ -20,6 +21,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   conversations: typeof conversations;
+  members: typeof members;
   messages: typeof messages;
   users: typeof users;
 }>;
