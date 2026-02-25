@@ -12,20 +12,20 @@ export default function UserSync() {
 
     useEffect(() => {
         if (isLoaded && user) {
-            // Sync on load
+            // Sync on load and mark online immediately
             syncUser({
                 clerkId: user.id,
                 email: user.emailAddresses[0]?.emailAddress || "",
                 name: user.fullName || user.firstName || "Unknown",
                 imageUrl: user.imageUrl,
             });
+            updatePresence({ clerkId: user.id, isOnline: true });
 
-            // Presence heartbeat interval (30s)
+            // Presence heartbeat every 10s for near-real-time updates
             const heartbeat = setInterval(() => {
                 updatePresence({ clerkId: user.id, isOnline: document.visibilityState === "visible" });
-            }, 30000);
+            }, 10000);
 
-            // Event listeners for window states
             const handleVisibilityChange = () => {
                 updatePresence({ clerkId: user.id, isOnline: document.visibilityState === "visible" });
             };
@@ -39,6 +39,7 @@ export default function UserSync() {
 
             return () => {
                 clearInterval(heartbeat);
+                updatePresence({ clerkId: user.id, isOnline: false });
                 document.removeEventListener("visibilitychange", handleVisibilityChange);
                 window.removeEventListener("beforeunload", handleBeforeUnload);
             };

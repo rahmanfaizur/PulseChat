@@ -170,12 +170,20 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
                                         {!isMine && (
                                             <div className="w-8 shrink-0">
                                                 {showAvatar && (
-                                                    <Avatar className="h-8 w-8 border border-zinc-800">
-                                                        <AvatarImage src={msg.sender?.imageUrl} alt={msg.sender?.name || ""} />
-                                                        <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
-                                                            {msg.sender?.name?.charAt(0) || "U"}
-                                                        </AvatarFallback>
-                                                    </Avatar>
+                                                    <div className="relative">
+                                                        <Avatar className="h-8 w-8 border border-zinc-800">
+                                                            <AvatarImage src={msg.sender?.imageUrl} alt={msg.sender?.name || ""} />
+                                                            <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
+                                                                {msg.sender?.name?.charAt(0) || "U"}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                        {msg.sender?.isOnline && (
+                                                            <span className="absolute bottom-0 right-0 flex h-2.5 w-2.5">
+                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 border-[1.5px] border-zinc-900"></span>
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
                                         )}

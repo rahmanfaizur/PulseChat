@@ -83,12 +83,24 @@ export default function UserList({ searchQuery }: { searchQuery: string }) {
                                 </AvatarFallback>
                             </Avatar>
                             {u.isOnline && (
-                                <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-zinc-950 rounded-full"></span>
+                                <span className="absolute bottom-0 right-0 flex h-3 w-3">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border-2 border-zinc-950"></span>
+                                </span>
                             )}
                         </div>
                         <div className="flex-1 overflow-hidden">
                             <p className="text-sm font-medium text-zinc-100 truncate">{u.name}</p>
-                            <p className="text-xs text-zinc-500 truncate">{u.email}</p>
+                            <div className="flex items-center gap-1.5">
+                                {u.isOnline ? (
+                                    <>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                        <p className="text-xs text-emerald-400">Online</p>
+                                    </>
+                                ) : (
+                                    <p className="text-xs text-zinc-500 truncate">{u.email}</p>
+                                )}
+                            </div>
                         </div>
                     </button>
                 ))}

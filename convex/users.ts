@@ -1,7 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import type { Document, Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 
 export const syncUser = mutation({
     args: {
@@ -47,13 +47,13 @@ export const syncUser = mutation({
 });
 
 export const getUsers = query({
-    handler: async (ctx: QueryCtx): Promise<(Document<"users"> & { isOnline: boolean })[]> => {
+    handler: async (ctx: QueryCtx): Promise<any[]> => {
         const users = await ctx.db.query("users").collect();
 
-        // Consider users offline if not seen for 60 seconds
-        const threshold = Date.now() - 60000;
+        // Consider users offline if not seen for 25 seconds (heartbeat is 10s)
+        const threshold = Date.now() - 25000;
 
-        return users.map((user: Document<"users">) => ({
+        return users.map((user: any) => ({
             ...user,
             isOnline: user.isOnline && user.lastSeen > threshold
         }));
