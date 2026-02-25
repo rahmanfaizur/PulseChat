@@ -188,7 +188,7 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
             <div className="flex-1 min-h-0 relative bg-gradient-to-br from-[#150a26] via-[#09050d] to-[#040206]">
                 <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain">
                     <div ref={innerRef} className="py-6">
-                        <div className="max-w-4xl mx-auto w-full flex flex-col">
+                        <div className="mx-auto w-full flex flex-col">
                             {messages.map((msg: any, index: number) => {
                                 const isMine = msg.isMine;
                                 const isHovered = hoveredId === msg._id;
