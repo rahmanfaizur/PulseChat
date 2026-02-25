@@ -390,7 +390,7 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
                                                             {msg.reactions && msg.reactions.length > 0 && (
                                                                 <DropdownMenuItem
                                                                     onClick={() => {
-                                                                        setReactionsModalMsg(msg);
+                                                                        setReactionsModalMsgId(msg._id);
                                                                         setActiveReactionTab(msg.reactions[0]?.emoji || null);
                                                                     }}
                                                                     className="gap-2.5 cursor-pointer focus:bg-white/10 focus:text-zinc-100"
