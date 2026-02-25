@@ -65,111 +65,113 @@ export default function MessageList({ conversationId }: MessageListProps) {
     return (
         <div className="flex-1 flex flex-col overflow-hidden relative">
             <ScrollArea className="flex-1 p-4" viewportRef={scrollRef} onScroll={handleScroll}>
-                <div className="max-w-4xl mx-auto space-y-6 pb-2">
-                    {messages.map((msg: any, index: number) => {
-                        const isMine = msg.isMine;
-                        const showAvatar = !isMine && (index === messages.length - 1 || messages[index + 1]?.senderId !== msg.senderId);
+                <div className="flex flex-col justify-end min-h-full">
+                    <div className="max-w-4xl mx-auto w-full space-y-6 pb-2 mt-auto">
+                        {messages.map((msg: any, index: number) => {
+                            const isMine = msg.isMine;
+                            const showAvatar = !isMine && (index === messages.length - 1 || messages[index + 1]?.senderId !== msg.senderId);
 
-                        return (
-                            <div key={msg._id} className={`flex items-end space-x-2 ${isMine ? "justify-end" : "justify-start"}`}>
-                                {!isMine && (
-                                    <div className="w-8 shrink-0">
-                                        {showAvatar && (
-                                            <Avatar className="h-8 w-8 border border-zinc-800">
-                                                <AvatarImage src={msg.sender?.imageUrl} alt={msg.sender?.name || ""} />
-                                                <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
-                                                    {msg.sender?.name?.charAt(0) || "U"}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                        )}
-                                    </div>
-                                )}
-
-                                <div className="relative group flex flex-col items-start w-full" style={{ alignItems: isMine ? "flex-end" : "flex-start" }}>
-                                    <div
-                                        className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm relative ${isMine
-                                            ? "bg-indigo-600 text-white rounded-br-sm"
-                                            : "bg-zinc-800 text-zinc-100 rounded-bl-sm border border-white/5"
-                                            }`}
-                                    >
-                                        <p className={`whitespace-pre-wrap break-words leading-relaxed ${msg.isDeleted ? "italic opacity-80 text-xs" : ""}`}>
-                                            {msg.content}
-                                        </p>
-                                        <div className={`flex items-center justify-end space-x-1 mt-1 ${isMine ? "text-indigo-200" : "text-zinc-500"}`}>
-                                            <span className="text-[10px]">{formatTimestamp(msg._creationTime)}</span>
-                                        </div>
-
-                                        {/* Action Buttons (Hover) */}
-                                        <div className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-[.group]:hover:opacity-100 transition-all z-10 ${isMine ? "right-full mr-2" : "left-full ml-2"}`}>
-                                            {!msg.isDeleted && (
-                                                <div className="flex bg-zinc-800/90 backdrop-blur-sm rounded-full shadow-md border border-white/10 overflow-hidden">
-                                                    {EMOJIS.map(emoji => (
-                                                        <button
-                                                            key={emoji}
-                                                            onClick={(e) => { e.stopPropagation(); toggleReaction({ messageId: msg._id, reaction: emoji }).catch(() => { }); }}
-                                                            className="p-1.5 hover:bg-zinc-600 transition-colors text-[13px]"
-                                                        >
-                                                            {emoji}
-                                                        </button>
-                                                    ))}
-                                                </div>
+                            return (
+                                <div key={msg._id} className={`flex items-end space-x-2 ${isMine ? "justify-end" : "justify-start"}`}>
+                                    {!isMine && (
+                                        <div className="w-8 shrink-0">
+                                            {showAvatar && (
+                                                <Avatar className="h-8 w-8 border border-zinc-800">
+                                                    <AvatarImage src={msg.sender?.imageUrl} alt={msg.sender?.name || ""} />
+                                                    <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
+                                                        {msg.sender?.name?.charAt(0) || "U"}
+                                                    </AvatarFallback>
+                                                </Avatar>
                                             )}
-
-                                            {isMine && !msg.isDeleted && (
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); deleteMessage({ messageId: msg._id }).catch(() => { }); }}
-                                                    className="p-2 rounded-full bg-zinc-800/90 backdrop-blur-sm text-zinc-400 hover:text-red-400 hover:bg-zinc-700 transition-all shadow-md border border-white/10"
-                                                    title="Delete message"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Reactions Display */}
-                                    {msg.reactions && msg.reactions.length > 0 && (
-                                        <div className={`flex flex-wrap gap-1 mt-1 ${isMine ? "justify-end" : "justify-start"}`}>
-                                            {msg.reactions.map(({ emoji, userIds }: { emoji: string, userIds: any[] }) => {
-                                                const hasReacted = userIds.includes(typingMembers?.[0]?._id); // Pseudo self check to make some state different visually (not strictly accurate for now but works for demo)
-                                                return (
-                                                    <button
-                                                        key={emoji}
-                                                        onClick={() => toggleReaction({ messageId: msg._id, reaction: emoji }).catch(() => { })}
-                                                        className={`px-1.5 py-0.5 rounded-full text-[11px] flex items-center gap-1 border transition-colors ${hasReacted
-                                                            ? "bg-indigo-600/20 border-indigo-500/30 text-indigo-200"
-                                                            : "bg-zinc-800/80 border-white/5 text-zinc-300 hover:bg-zinc-700"
-                                                            }`}
-                                                    >
-                                                        <span>{emoji}</span>
-                                                        <span>{userIds.length}</span>
-                                                    </button>
-                                                )
-                                            })}
                                         </div>
                                     )}
+
+                                    <div className="relative group flex flex-col items-start w-full" style={{ alignItems: isMine ? "flex-end" : "flex-start" }}>
+                                        <div
+                                            className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm relative ${isMine
+                                                ? "bg-indigo-600 text-white rounded-br-sm"
+                                                : "bg-zinc-800 text-zinc-100 rounded-bl-sm border border-white/5"
+                                                }`}
+                                        >
+                                            <p className={`whitespace-pre-wrap break-words leading-relaxed ${msg.isDeleted ? "italic opacity-80 text-xs" : ""}`}>
+                                                {msg.content}
+                                            </p>
+                                            <div className={`flex items-center justify-end space-x-1 mt-1 ${isMine ? "text-indigo-200" : "text-zinc-500"}`}>
+                                                <span className="text-[10px]">{formatTimestamp(msg._creationTime)}</span>
+                                            </div>
+
+                                            {/* Action Buttons (Hover) */}
+                                            <div className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-[.group]:hover:opacity-100 transition-all z-10 ${isMine ? "right-full mr-2" : "left-full ml-2"}`}>
+                                                {!msg.isDeleted && (
+                                                    <div className="flex bg-zinc-800/90 backdrop-blur-sm rounded-full shadow-md border border-white/10 overflow-hidden">
+                                                        {EMOJIS.map(emoji => (
+                                                            <button
+                                                                key={emoji}
+                                                                onClick={(e) => { e.stopPropagation(); toggleReaction({ messageId: msg._id, reaction: emoji }).catch(() => { }); }}
+                                                                className="p-1.5 hover:bg-zinc-600 transition-colors text-[13px]"
+                                                            >
+                                                                {emoji}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {isMine && !msg.isDeleted && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); deleteMessage({ messageId: msg._id }).catch(() => { }); }}
+                                                        className="p-2 rounded-full bg-zinc-800/90 backdrop-blur-sm text-zinc-400 hover:text-red-400 hover:bg-zinc-700 transition-all shadow-md border border-white/10"
+                                                        title="Delete message"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Reactions Display */}
+                                        {msg.reactions && msg.reactions.length > 0 && (
+                                            <div className={`flex flex-wrap gap-1 mt-1 ${isMine ? "justify-end" : "justify-start"}`}>
+                                                {msg.reactions.map(({ emoji, userIds }: { emoji: string, userIds: any[] }) => {
+                                                    const hasReacted = userIds.includes(typingMembers?.[0]?._id); // Pseudo self check to make some state different visually (not strictly accurate for now but works for demo)
+                                                    return (
+                                                        <button
+                                                            key={emoji}
+                                                            onClick={() => toggleReaction({ messageId: msg._id, reaction: emoji }).catch(() => { })}
+                                                            className={`px-1.5 py-0.5 rounded-full text-[11px] flex items-center gap-1 border transition-colors ${hasReacted
+                                                                ? "bg-indigo-600/20 border-indigo-500/30 text-indigo-200"
+                                                                : "bg-zinc-800/80 border-white/5 text-zinc-300 hover:bg-zinc-700"
+                                                                }`}
+                                                        >
+                                                            <span>{emoji}</span>
+                                                            <span>{userIds.length}</span>
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        {typingMembers && typingMembers.length > 0 && (
+                            <div className="flex items-end space-x-2 justify-start">
+                                <div className="w-8 shrink-0">
+                                    <Avatar className="h-8 w-8 border border-zinc-800">
+                                        <AvatarImage src={(typingMembers[0] as any)?.imageUrl} />
+                                        <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
+                                            {(typingMembers[0] as any)?.name?.charAt(0) || "U"}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                </div>
+                                <div className="bg-zinc-800 border border-white/5 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center space-x-1 shadow-sm">
+                                    <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                    <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                    <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
                                 </div>
                             </div>
-                        );
-                    })}
-
-                    {typingMembers && typingMembers.length > 0 && (
-                        <div className="flex items-end space-x-2 justify-start">
-                            <div className="w-8 shrink-0">
-                                <Avatar className="h-8 w-8 border border-zinc-800">
-                                    <AvatarImage src={(typingMembers[0] as any)?.imageUrl} />
-                                    <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
-                                        {(typingMembers[0] as any)?.name?.charAt(0) || "U"}
-                                    </AvatarFallback>
-                                </Avatar>
-                            </div>
-                            <div className="bg-zinc-800 border border-white/5 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center space-x-1 shadow-sm">
-                                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
-                            </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </ScrollArea>
 
