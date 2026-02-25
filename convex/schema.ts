@@ -14,6 +14,7 @@ export default defineSchema({
     conversations: defineTable({
         isGroup: v.boolean(),
         name: v.optional(v.string()),
+        imageUrl: v.optional(v.string()),
     }),
 
     conversationMembers: defineTable({

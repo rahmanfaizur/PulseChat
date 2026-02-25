@@ -128,8 +128,10 @@ export const getMessages = query({
                     if (replyMsg) {
                         const replySender = await ctx.db.get(replyMsg.senderId) as any;
                         replyTo = {
+                            messageId: replyMsg._id,
                             content: replyMsg.isDeleted ? "This message was deleted" : replyMsg.content,
                             senderName: replySender?.name || "Unknown",
+                            senderImageUrl: replySender?.imageUrl || null,
                         };
                     }
                 }

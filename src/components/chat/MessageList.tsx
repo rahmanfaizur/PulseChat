@@ -59,6 +59,7 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
 
     const [showScrollButton, setShowScrollButton] = useState(false);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
+    const [highlightedId, setHighlightedId] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<{ id: string; } | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
@@ -113,11 +114,24 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
         setShowScrollButton(false);
     }, []);
 
+    // Mark as read immediately when conversation is opened or new messages arrive
     useEffect(() => {
-        if (messages && messages.length > 0) {
-            markAsRead({ conversationId, messageId: messages[messages.length - 1]._id }).catch(() => { });
-        }
-    }, [messages, conversationId, markAsRead]);
+        if (!messages || messages.length === 0) return;
+
+        const lastMessage = messages[messages.length - 1];
+
+        const doMark = () => {
+            if (document.visibilityState === "visible") {
+                markAsRead({ conversationId, messageId: lastMessage._id }).catch(() => { });
+            }
+        };
+
+        doMark();
+
+        document.addEventListener("visibilitychange", doMark);
+        return () => document.removeEventListener("visibilitychange", doMark);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [messages?.length, conversationId]);
 
     const handleForward = (msg: any) => {
         forwardMessage({ conversationId, content: msg.content })
@@ -185,7 +199,7 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
 
     return (
         <>
-            <div className="flex-1 min-h-0 relative bg-gradient-to-br from-[#150a26] via-[#09050d] to-[#040206]">
+            <div className="flex-1 min-h-0 relative bg-gradient-to-br from-[#2d1065] via-[#1a0533] to-[#0d0120]">
                 <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain">
                     <div ref={innerRef} className="py-6">
                         <div className="mx-auto w-full flex flex-col">
@@ -199,7 +213,8 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
                                 return (
                                     <div
                                         key={msg._id}
-                                        className={`group flex items-start gap-4 px-6 py-1 hover:bg-white/[0.03] transition-colors relative ${showAvatar ? "mt-5" : ""}`}
+                                        id={`msg-${msg._id}`}
+                                        className={`group flex items-start gap-4 px-6 py-1 hover:bg-white/[0.03] transition-colors relative ${showAvatar ? "mt-5" : ""} ${highlightedId === msg._id ? "bg-violet-500/10 !bg-violet-500/10" : ""}`}
                                         onMouseEnter={() => setHoveredId(msg._id)}
                                         onMouseLeave={() => setHoveredId(null)}
                                     >
@@ -242,9 +257,25 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
 
                                             {/* Reply preview */}
                                             {msg.replyTo && (
-                                                <div className="mb-1.5 flex items-center gap-2 cursor-pointer text-white/40 hover:text-white/70 transition-colors">
+                                                <div
+                                                    className="mb-1.5 flex items-center gap-2 cursor-pointer text-white/40 hover:text-white/70 transition-colors group/reply"
+                                                    onClick={() => {
+                                                        const el = document.getElementById(`msg-${msg.replyTo.messageId}`);
+                                                        if (el) {
+                                                            el.scrollIntoView({ behavior: "smooth", block: "center" });
+                                                            setHighlightedId(msg.replyTo.messageId);
+                                                            setTimeout(() => setHighlightedId(null), 1800);
+                                                        }
+                                                    }}
+                                                >
                                                     <div className="w-8 border-t-2 border-l-2 border-white/10 rounded-tl-xl h-5 absolute -left-[38px] top-2" />
-                                                    <span className="text-xs font-semibold">@{msg.replyTo.senderName}</span>
+                                                    <Avatar className="h-5 w-5 border border-white/10 shrink-0">
+                                                        <AvatarImage src={msg.replyTo.senderImageUrl} />
+                                                        <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-fuchsia-600 text-[9px] text-white">
+                                                            {msg.replyTo.senderName?.charAt(0) || "U"}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <span className="text-xs font-semibold text-violet-300/70 group-hover/reply:text-violet-300 transition-colors">{msg.replyTo.senderName}</span>
                                                     <span className="text-xs truncate max-w-sm">{msg.replyTo.content}</span>
                                                 </div>
                                             )}
@@ -260,8 +291,9 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
                                                 <TooltipProvider delayDuration={300}>
                                                     <div className="flex flex-wrap gap-1.5 mt-2 justify-start">
                                                         {msg.reactions.map(({ emoji, users, userIds }: { emoji: string; users: any[]; userIds: any[] }) => {
-                                                            const hasReacted = users.some(u => u.clerkId === user?.id);
-                                                            const participantNames = users.map(u => u.name?.split(" ")[0]).join(", ");
+                                                            const safeUsers = users ?? [];
+                                                            const hasReacted = safeUsers.some(u => u.clerkId === user?.id);
+                                                            const participantNames = safeUsers.map(u => u.name?.split(" ")[0]).join(", ");
                                                             return (
                                                                 <Tooltip key={emoji}>
                                                                     <TooltipTrigger asChild>

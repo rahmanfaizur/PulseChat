@@ -95,7 +95,7 @@ export default function MessageInput({ conversationId, replyTo, onCancelReply }:
     };
 
     return (
-        <div className="p-4 bg-zinc-950 shrink-0">
+        <div className="p-4 bg-gradient-to-r from-[#1a0533]/90 to-[#0d0120]/90 border-t border-white/5 shrink-0 backdrop-blur-sm">
             {/* Reply preview banner */}
             {replyTo && (
                 <div className="max-w-4xl mx-auto w-full mb-2 flex items-center gap-2 bg-zinc-800/70 border border-white/10 rounded-xl px-3 py-2">

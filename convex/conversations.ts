@@ -105,6 +105,7 @@ export const getMyConversations = query({
                     .order("desc")
                     .first();
 
+                // Count messages from OTHERS that arrived after my last read
                 let unreadCount = 0;
                 if (membership.lastReadMessageId) {
                     const lastRead = await ctx.db.get(membership.lastReadMessageId as Id<"messages">);
@@ -112,16 +113,23 @@ export const getMyConversations = query({
                         const unread = await ctx.db
                             .query("messages")
                             .withIndex("by_conversationId", (q: any) => q.eq("conversationId", conversation._id))
-                            .filter((q: any) => q.gt(q.field("_creationTime"), lastRead._creationTime))
+                            .filter((q: any) =>
+                                q.and(
+                                    q.gt(q.field("_creationTime"), lastRead._creationTime),
+                                    q.neq(q.field("senderId"), user._id)
+                                )
+                            )
                             .collect();
                         unreadCount = unread.length;
                     }
                 } else {
-                    const allMsgs = await ctx.db
+                    // No lastRead yet — count only messages from others
+                    const allUnread = await ctx.db
                         .query("messages")
                         .withIndex("by_conversationId", (q: any) => q.eq("conversationId", conversation._id))
+                        .filter((q: any) => q.neq(q.field("senderId"), user._id))
                         .collect();
-                    unreadCount = allMsgs.length;
+                    unreadCount = allUnread.length;
                 }
 
                 return {
@@ -129,6 +137,7 @@ export const getMyConversations = query({
                     otherMembers: otherMembers.filter((m: any) => m !== null),
                     lastMessage,
                     unreadCount,
+                    imageUrl: (conversation as any).imageUrl ?? null,
                 };
             })
         );
@@ -147,6 +156,7 @@ export const createGroup = mutation({
     args: {
         name: v.string(),
         memberIds: v.array(v.id("users")),
+        imageUrl: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
@@ -164,6 +174,7 @@ export const createGroup = mutation({
         const conversationId = await ctx.db.insert("conversations", {
             isGroup: true,
             name: args.name,
+            imageUrl: args.imageUrl,
         });
 
         await Promise.all(
