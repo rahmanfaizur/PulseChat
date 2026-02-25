@@ -116,10 +116,22 @@ export const getMessages = query({
                     return acc;
                 }, {});
 
-                const reactions = Object.keys(reactionsMap).map((emoji) => ({
-                    emoji,
-                    userIds: reactionsMap[emoji]
-                }));
+                const reactions = await Promise.all(
+                    Object.keys(reactionsMap).map(async (emoji) => {
+                        const userIds = reactionsMap[emoji];
+                        const users = await Promise.all(
+                            userIds.map(async (uid: any) => {
+                                const u = await ctx.db.get(uid) as any;
+                                return u ? { _id: u._id, name: u.name, imageUrl: u.imageUrl, clerkId: u.clerkId } : null;
+                            })
+                        );
+                        return {
+                            emoji,
+                            userIds,
+                            users: users.filter(Boolean),
+                        };
+                    })
+                );
 
                 // Fetch replied-to message if present
                 let replyTo = null;
