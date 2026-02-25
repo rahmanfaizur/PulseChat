@@ -128,17 +128,17 @@ export default function MessageList({ conversationId }: MessageListProps) {
                                     </div>
 
                                     {/* Reactions Display */}
-                                    {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                                    {msg.reactions && msg.reactions.length > 0 && (
                                         <div className={`flex flex-wrap gap-1 mt-1 ${isMine ? "justify-end" : "justify-start"}`}>
-                                            {Object.entries(msg.reactions).map(([emoji, userIds]: [string, any]) => {
+                                            {msg.reactions.map(({ emoji, userIds }: { emoji: string, userIds: any[] }) => {
                                                 const hasReacted = userIds.includes(typingMembers?.[0]?._id); // Pseudo self check to make some state different visually (not strictly accurate for now but works for demo)
                                                 return (
                                                     <button
                                                         key={emoji}
                                                         onClick={() => toggleReaction({ messageId: msg._id, reaction: emoji }).catch(() => { })}
                                                         className={`px-1.5 py-0.5 rounded-full text-[11px] flex items-center gap-1 border transition-colors ${hasReacted
-                                                                ? "bg-indigo-600/20 border-indigo-500/30 text-indigo-200"
-                                                                : "bg-zinc-800/80 border-white/5 text-zinc-300 hover:bg-zinc-700"
+                                                            ? "bg-indigo-600/20 border-indigo-500/30 text-indigo-200"
+                                                            : "bg-zinc-800/80 border-white/5 text-zinc-300 hover:bg-zinc-700"
                                                             }`}
                                                     >
                                                         <span>{emoji}</span>

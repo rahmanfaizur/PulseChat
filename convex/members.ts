@@ -27,9 +27,39 @@ export const setTyping = mutation({
 
         if (!membership) throw new Error("Not a member of this conversation");
 
-        // set typingUntil to 3 seconds from now
+        // set typingUntil to 8 seconds from now
         await ctx.db.patch(membership._id, {
-            typingUntil: Date.now() + 3000,
+            typingUntil: Date.now() + 8000,
+        });
+    },
+});
+
+export const clearTyping = mutation({
+    args: {
+        conversationId: v.id("conversations"),
+    },
+    handler: async (ctx: MutationCtx, args: { conversationId: string }) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthorized");
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q: any) => q.eq("clerkId", identity.subject))
+            .unique();
+
+        if (!user) throw new Error("User not found");
+
+        const membership = await ctx.db
+            .query("conversationMembers")
+            .withIndex("by_conversationId_userId", (q: any) =>
+                q.eq("conversationId", args.conversationId).eq("userId", user._id)
+            )
+            .unique();
+
+        if (!membership) throw new Error("Not a member of this conversation");
+
+        await ctx.db.patch(membership._id, {
+            typingUntil: undefined,
         });
     },
 });

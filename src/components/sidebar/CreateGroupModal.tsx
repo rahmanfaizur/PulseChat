@@ -50,8 +50,8 @@ export default function CreateGroupModal({ isOpen, onClose }: CreateGroupModalPr
             toast.error("Group name is required");
             return;
         }
-        if (selectedUsers.size < 2) {
-            toast.error("Select at least 2 other members for a group chat");
+        if (selectedUsers.size < 1) {
+            toast.error("Select at least 1 other member for a group chat");
             return;
         }
 
@@ -141,7 +141,7 @@ export default function CreateGroupModal({ isOpen, onClose }: CreateGroupModalPr
                     </button>
                     <button
                         onClick={handleCreate}
-                        disabled={isLoading || !name.trim() || selectedUsers.size < 2}
+                        disabled={isLoading || !name.trim() || selectedUsers.size < 1}
                         className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
                         {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}

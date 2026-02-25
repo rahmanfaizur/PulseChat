@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { SendHorizontal } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -15,17 +15,41 @@ export default function MessageInput({ conversationId }: MessageInputProps) {
     const [content, setContent] = useState("");
     const sendMessage = useMutation(api.messages.sendMessage);
     const setTyping = useMutation(api.members.setTyping);
+    const clearTyping = useMutation(api.members.clearTyping);
     const [isSending, setIsSending] = useState(false);
 
     const lastTyped = useRef(0);
+    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        };
+    }, []);
 
     const handleTyping = (val: string) => {
         setContent(val);
+
+        if (val.trim() === "") {
+            clearTyping({ conversationId }).catch(() => { });
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            return;
+        }
+
         const now = Date.now();
         if (now - lastTyped.current > 1500) {
             lastTyped.current = now;
             setTyping({ conversationId }).catch(() => { });
         }
+
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
+
+        typingTimeoutRef.current = setTimeout(() => {
+            clearTyping({ conversationId }).catch(() => { });
+            lastTyped.current = 0;
+        }, 7000);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -37,7 +61,10 @@ export default function MessageInput({ conversationId }: MessageInputProps) {
         setContent("");
 
         try {
-            await sendMessage({ conversationId, content: text });
+            await Promise.all([
+                sendMessage({ conversationId, content: text }),
+                clearTyping({ conversationId })
+            ]);
         } catch (error) {
             console.error("Failed to send message", error);
             toast.error("Failed to send message. Please try again.");

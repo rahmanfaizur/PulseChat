@@ -75,11 +75,16 @@ export const getMessages = query({
                     .collect();
 
                 // Group by emoji
-                const reactions = rawReactions.reduce((acc: any, r: any) => {
+                const reactionsMap = rawReactions.reduce((acc: any, r: any) => {
                     if (!acc[r.reaction]) acc[r.reaction] = [];
                     acc[r.reaction].push(r.userId);
                     return acc;
                 }, {});
+
+                const reactions = Object.keys(reactionsMap).map((emoji) => ({
+                    emoji,
+                    userIds: reactionsMap[emoji]
+                }));
 
                 return {
                     ...msg,
