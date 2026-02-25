@@ -5,6 +5,7 @@ export const sendMessage = mutation({
     args: {
         conversationId: v.id("conversations"),
         content: v.string(),
+        replyToId: v.optional(v.id("messages")),
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
@@ -17,7 +18,6 @@ export const sendMessage = mutation({
 
         if (!user) throw new Error("User not found");
 
-        // Verify membership
         const membership = await ctx.db
             .query("conversationMembers")
             .withIndex("by_conversationId_userId", (q) =>
@@ -32,13 +32,50 @@ export const sendMessage = mutation({
             senderId: user._id,
             content: args.content,
             isDeleted: false,
+            replyToId: args.replyToId,
         });
 
-        // Automatically mark as read for sender
         await ctx.db.patch(membership._id, {
             lastReadMessageId: messageId,
         });
 
+        return messageId;
+    },
+});
+
+export const forwardMessage = mutation({
+    args: {
+        conversationId: v.id("conversations"),
+        content: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthorized");
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+            .unique();
+
+        if (!user) throw new Error("User not found");
+
+        const membership = await ctx.db
+            .query("conversationMembers")
+            .withIndex("by_conversationId_userId", (q) =>
+                q.eq("conversationId", args.conversationId).eq("userId", user._id)
+            )
+            .unique();
+
+        if (!membership) throw new Error("Not a member of this conversation");
+
+        const messageId = await ctx.db.insert("messages", {
+            conversationId: args.conversationId,
+            senderId: user._id,
+            content: `↪ ${args.content}`,
+            isDeleted: false,
+        });
+
+        await ctx.db.patch(membership._id, { lastReadMessageId: messageId });
         return messageId;
     },
 });
@@ -64,7 +101,6 @@ export const getMessages = query({
             .order("asc")
             .collect();
 
-        // Map sender info and reactions
         const messagesWithDetails = await Promise.all(
             messages.map(async (msg: any) => {
                 const sender = (await ctx.db.get(msg.senderId)) as any;
@@ -74,7 +110,6 @@ export const getMessages = query({
                     .withIndex("by_messageId", (q: any) => q.eq("messageId", msg._id))
                     .collect();
 
-                // Group by emoji
                 const reactionsMap = rawReactions.reduce((acc: any, r: any) => {
                     if (!acc[r.reaction]) acc[r.reaction] = [];
                     acc[r.reaction].push(r.userId);
@@ -86,11 +121,25 @@ export const getMessages = query({
                     userIds: reactionsMap[emoji]
                 }));
 
+                // Fetch replied-to message if present
+                let replyTo = null;
+                if (msg.replyToId) {
+                    const replyMsg = await ctx.db.get(msg.replyToId) as any;
+                    if (replyMsg) {
+                        const replySender = await ctx.db.get(replyMsg.senderId) as any;
+                        replyTo = {
+                            content: replyMsg.isDeleted ? "This message was deleted" : replyMsg.content,
+                            senderName: replySender?.name || "Unknown",
+                        };
+                    }
+                }
+
                 return {
                     ...msg,
                     sender: sender ? { name: sender.name, imageUrl: sender.imageUrl, isOnline: sender.isOnline } : null,
                     isMine: msg.senderId === user._id,
                     reactions,
+                    replyTo,
                 };
             })
         );

@@ -7,62 +7,66 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useRef, useCallback, useState } from "react";
 import { formatTimestamp } from "@/lib/utils";
-import { ArrowDown, MoreHorizontal, Trash2 } from "lucide-react";
+import { ArrowDown, MoreHorizontal, Trash2, Reply, Forward } from "lucide-react";
+import { ReplyContext } from "./ChatView";
+import { toast } from "sonner";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface MessageListProps {
     conversationId: Id<"conversations">;
+    onReply: (ctx: ReplyContext) => void;
 }
 
 const EMOJIS = ["👍", "❤️", "😂", "😮", "😢"];
 
-export default function MessageList({ conversationId }: MessageListProps) {
+export default function MessageList({ conversationId, onReply }: MessageListProps) {
     const messages = useQuery(api.messages.getMessages, { conversationId });
     const typingMembers = useQuery(api.members.getTypingMembers, { conversationId });
     const markAsRead = useMutation(api.members.markAsRead);
     const deleteMessage = useMutation(api.messages.deleteMessage);
     const toggleReaction = useMutation(api.reactions.toggleReaction);
+    const forwardMessage = useMutation(api.messages.forwardMessage);
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const innerRef = useRef<HTMLDivElement>(null);
     const prevInnerHeight = useRef<number | null>(null);
+
     const [showScrollButton, setShowScrollButton] = useState(false);
-
-    // Per-message hover and dropdown state
     const [hoveredId, setHoveredId] = useState<string | null>(null);
-    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<{ id: string; } | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
-    // Close menu on outside click
-    useEffect(() => {
-        const handleClick = () => setOpenMenuId(null);
-        document.addEventListener("click", handleClick);
-        return () => document.removeEventListener("click", handleClick);
-    }, []);
-
-    // Scroll logic (article pattern with prevInnerHeight ref)
+    // Scroll logic (article pattern)
     useEffect(() => {
         const outer = scrollRef.current;
         const inner = innerRef.current;
         if (!outer || !inner) return;
-
         const outerH = outer.clientHeight;
         const innerH = inner.clientHeight;
         const scrollTop = outer.scrollTop;
-
-        const wasAtBottom =
-            !prevInnerHeight.current ||
-            scrollTop >= prevInnerHeight.current - outerH - 60;
-
+        const wasAtBottom = !prevInnerHeight.current || scrollTop >= prevInnerHeight.current - outerH - 60;
         if (wasAtBottom) {
-            outer.scrollTo({
-                top: innerH - outerH,
-                left: 0,
-                behavior: prevInnerHeight.current ? "smooth" : "auto",
-            });
+            outer.scrollTo({ top: innerH - outerH, left: 0, behavior: prevInnerHeight.current ? "smooth" : "auto" });
             setShowScrollButton(false);
         } else {
             setShowScrollButton(true);
         }
-
         prevInnerHeight.current = innerH;
     }, [messages, typingMembers]);
 
@@ -70,7 +74,7 @@ export default function MessageList({ conversationId }: MessageListProps) {
         prevInnerHeight.current = null;
         setShowScrollButton(false);
         setHoveredId(null);
-        setOpenMenuId(null);
+        setDeleteTarget(null);
     }, [conversationId]);
 
     const scrollToBottom = useCallback(() => {
@@ -83,10 +87,37 @@ export default function MessageList({ conversationId }: MessageListProps) {
 
     useEffect(() => {
         if (messages && messages.length > 0) {
-            const last = messages[messages.length - 1];
-            markAsRead({ conversationId, messageId: last._id }).catch(() => { });
+            markAsRead({ conversationId, messageId: messages[messages.length - 1]._id }).catch(() => { });
         }
     }, [messages, conversationId, markAsRead]);
+
+    const handleForward = (msg: any) => {
+        forwardMessage({ conversationId, content: msg.content })
+            .then(() => toast.success("Message forwarded"))
+            .catch(() => toast.error("Failed to forward"));
+    };
+
+    const handleReply = (msg: any) => {
+        onReply({
+            messageId: msg._id,
+            senderName: msg.isMine ? "You" : msg.sender?.name || "Unknown",
+            content: msg.content,
+        });
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
+        try {
+            await deleteMessage({ messageId: deleteTarget.id as Id<"messages"> });
+            toast.success("Message deleted");
+            setDeleteTarget(null);
+        } catch {
+            toast.error("Failed to delete message");
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     if (messages === undefined) {
         return (
@@ -115,178 +146,244 @@ export default function MessageList({ conversationId }: MessageListProps) {
     }
 
     return (
-        <div className="flex-1 min-h-0 relative">
-            <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain">
-                <div ref={innerRef} className="px-4 py-4">
-                    <div className="max-w-4xl mx-auto w-full flex flex-col gap-1">
-                        {messages.map((msg: any, index: number) => {
-                            const isMine = msg.isMine;
-                            const isHovered = hoveredId === msg._id;
-                            const menuOpen = openMenuId === msg._id;
-                            const showAvatar =
-                                !isMine &&
-                                (index === messages.length - 1 ||
-                                    messages[index + 1]?.senderId !== msg.senderId);
+        <>
+            <div className="flex-1 min-h-0 relative">
+                <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain">
+                    <div ref={innerRef} className="px-4 py-4">
+                        <div className="max-w-4xl mx-auto w-full flex flex-col gap-1">
+                            {messages.map((msg: any, index: number) => {
+                                const isMine = msg.isMine;
+                                const isHovered = hoveredId === msg._id;
+                                const showAvatar = !isMine && (
+                                    index === messages.length - 1 ||
+                                    messages[index + 1]?.senderId !== msg.senderId
+                                );
 
-                            return (
-                                <div
-                                    key={msg._id}
-                                    className={`flex items-end gap-2 py-0.5 ${isMine ? "justify-end" : "justify-start"}`}
-                                    onMouseEnter={() => setHoveredId(msg._id)}
-                                    onMouseLeave={() => {
-                                        if (!menuOpen) setHoveredId(null);
-                                    }}
-                                >
-                                    {/* Other user avatar */}
-                                    {!isMine && (
-                                        <div className="w-8 shrink-0">
-                                            {showAvatar && (
-                                                <Avatar className="h-8 w-8 border border-zinc-800">
-                                                    <AvatarImage src={msg.sender?.imageUrl} alt={msg.sender?.name || ""} />
-                                                    <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
-                                                        {msg.sender?.name?.charAt(0) || "U"}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                            )}
-                                        </div>
-                                    )}
+                                return (
+                                    <div
+                                        key={msg._id}
+                                        className={`flex items-end gap-2 py-0.5 ${isMine ? "justify-end" : "justify-start"}`}
+                                        onMouseEnter={() => setHoveredId(msg._id)}
+                                        onMouseLeave={() => setHoveredId(null)}
+                                    >
+                                        {/* Avatar */}
+                                        {!isMine && (
+                                            <div className="w-8 shrink-0">
+                                                {showAvatar && (
+                                                    <Avatar className="h-8 w-8 border border-zinc-800">
+                                                        <AvatarImage src={msg.sender?.imageUrl} alt={msg.sender?.name || ""} />
+                                                        <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
+                                                            {msg.sender?.name?.charAt(0) || "U"}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                )}
+                                            </div>
+                                        )}
 
-                                    {/* Row: action toolbar + bubble (reversed for mine) */}
-                                    <div className={`flex items-center gap-1.5 max-w-[70%] ${isMine ? "flex-row-reverse" : "flex-row"}`}>
+                                        {/* Toolbar + bubble row */}
+                                        <div className={`flex items-center gap-1.5 max-w-[70%] ${isMine ? "flex-row-reverse" : "flex-row"}`}>
 
-                                        {/* Message bubble */}
-                                        <div className="flex flex-col">
-                                            <div
-                                                className={`rounded-2xl px-4 py-2 text-sm shadow-sm transition-colors ${isMine
+                                            {/* Message bubble */}
+                                            <div className="flex flex-col">
+                                                {/* Reply preview */}
+                                                {msg.replyTo && (
+                                                    <div className={`mb-1 px-3 py-1.5 rounded-xl text-xs border-l-2 ${isMine
+                                                        ? "bg-indigo-700/40 border-indigo-300/50 text-indigo-200"
+                                                        : "bg-zinc-700/50 border-zinc-500 text-zinc-400"}`}>
+                                                        <p className="font-semibold text-[10px] mb-0.5 opacity-80">{msg.replyTo.senderName}</p>
+                                                        <p className="truncate">{msg.replyTo.content}</p>
+                                                    </div>
+                                                )}
+
+                                                <div className={`rounded-2xl px-4 py-2 text-sm shadow-sm ${isMine
                                                     ? "bg-indigo-600 text-white rounded-br-sm"
-                                                    : "bg-zinc-800 text-zinc-100 rounded-bl-sm border border-white/5"
-                                                    }`}
-                                            >
-                                                <p className={`whitespace-pre-wrap break-words leading-relaxed ${msg.isDeleted ? "italic opacity-80 text-xs" : ""}`}>
-                                                    {msg.content}
-                                                </p>
-                                                <div className={`flex items-center justify-end mt-1 ${isMine ? "text-indigo-200" : "text-zinc-500"}`}>
-                                                    <span className="text-[10px]">{formatTimestamp(msg._creationTime)}</span>
+                                                    : "bg-zinc-800 text-zinc-100 rounded-bl-sm border border-white/5"}`}>
+                                                    <p className={`whitespace-pre-wrap break-words leading-relaxed ${msg.isDeleted ? "italic opacity-60 text-xs" : ""}`}>
+                                                        {msg.content}
+                                                    </p>
+                                                    <div className={`flex items-center justify-end mt-1 ${isMine ? "text-indigo-200" : "text-zinc-500"}`}>
+                                                        <span className="text-[10px]">{formatTimestamp(msg._creationTime)}</span>
+                                                    </div>
                                                 </div>
+
+                                                {/* Reactions */}
+                                                {msg.reactions && msg.reactions.length > 0 && (
+                                                    <div className={`flex flex-wrap gap-1 mt-1 ${isMine ? "justify-end" : "justify-start"}`}>
+                                                        {msg.reactions.map(({ emoji, userIds }: { emoji: string; userIds: any[] }) => (
+                                                            <button
+                                                                key={emoji}
+                                                                onClick={() => toggleReaction({ messageId: msg._id, reaction: emoji }).catch(() => { })}
+                                                                className="px-1.5 py-0.5 rounded-full text-[11px] flex items-center gap-1 border bg-zinc-800/80 border-white/5 text-zinc-300 hover:bg-zinc-700 transition-colors"
+                                                            >
+                                                                <span>{emoji}</span>
+                                                                <span>{userIds.length}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
 
-                                            {/* Reactions */}
-                                            {msg.reactions && msg.reactions.length > 0 && (
-                                                <div className={`flex flex-wrap gap-1 mt-1 ${isMine ? "justify-end" : "justify-start"}`}>
-                                                    {msg.reactions.map(({ emoji, userIds }: { emoji: string; userIds: any[] }) => (
-                                                        <button
-                                                            key={emoji}
-                                                            onClick={() => toggleReaction({ messageId: msg._id, reaction: emoji }).catch(() => { })}
-                                                            className="px-1.5 py-0.5 rounded-full text-[11px] flex items-center gap-1 border bg-zinc-800/80 border-white/5 text-zinc-300 hover:bg-zinc-700 transition-colors"
-                                                        >
-                                                            <span>{emoji}</span>
-                                                            <span>{userIds.length}</span>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Hover toolbar — only shown for THIS hovered message */}
-                                        {(isHovered || menuOpen) && !msg.isDeleted && (
-                                            <div className="flex items-center shrink-0">
-                                                {/* Emoji + three-dot pill */}
-                                                <div className="flex items-center bg-zinc-800/95 backdrop-blur-sm rounded-full shadow-lg border border-white/10 overflow-hidden">
+                                            {/* Hover action toolbar — per message, React state controlled */}
+                                            {(isHovered || openDropdownId === msg._id) && !msg.isDeleted && (
+                                                <div className="flex items-center shrink-0 bg-zinc-800/95 backdrop-blur-sm rounded-full shadow-lg border border-white/10 overflow-visible">
+                                                    {/* Quick emoji reactions */}
                                                     {EMOJIS.map((emoji) => (
                                                         <button
                                                             key={emoji}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                toggleReaction({ messageId: msg._id, reaction: emoji }).catch(() => { });
-                                                            }}
-                                                            className="px-2 py-1.5 hover:bg-zinc-600 transition-colors text-[14px]"
+                                                            onClick={() => toggleReaction({ messageId: msg._id, reaction: emoji }).catch(() => { })}
+                                                            className="px-1.5 py-1.5 hover:bg-zinc-600 transition-colors text-[14px] first:rounded-l-full"
                                                             title={emoji}
                                                         >
                                                             {emoji}
                                                         </button>
                                                     ))}
 
-                                                    {/* Divider */}
                                                     <span className="w-px h-4 bg-white/10 mx-0.5" />
 
-                                                    {/* Three-dot menu button */}
-                                                    <div className="relative">
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setOpenMenuId(menuOpen ? null : msg._id);
-                                                            }}
-                                                            className="px-2 py-1.5 hover:bg-zinc-600 transition-colors text-zinc-400 hover:text-zinc-100 rounded-r-full"
-                                                            title="More options"
-                                                        >
-                                                            <MoreHorizontal className="w-4 h-4" />
-                                                        </button>
+                                                    {/* Reply */}
+                                                    <button
+                                                        onClick={() => handleReply(msg)}
+                                                        className="px-2 py-1.5 hover:bg-zinc-600 transition-colors text-zinc-400 hover:text-zinc-100"
+                                                        title="Reply"
+                                                    >
+                                                        <Reply className="w-3.5 h-3.5" />
+                                                    </button>
 
-                                                        {/* Dropdown popup */}
-                                                        {menuOpen && (
-                                                            <div
-                                                                className={`absolute z-50 mt-1 w-36 bg-zinc-800 border border-white/10 rounded-xl shadow-xl overflow-hidden ${isMine ? "right-0" : "left-0"} bottom-full mb-1`}
-                                                                onClick={(e) => e.stopPropagation()}
+                                                    {/* Forward */}
+                                                    <button
+                                                        onClick={() => handleForward(msg)}
+                                                        className="px-2 py-1.5 hover:bg-zinc-600 transition-colors text-zinc-400 hover:text-zinc-100"
+                                                        title="Forward"
+                                                    >
+                                                        <Forward className="w-3.5 h-3.5" />
+                                                    </button>
+
+                                                    <span className="w-px h-4 bg-white/10 mx-0.5" />
+
+                                                    {/* Three-dot dropdown — shadcn DropdownMenu */}
+                                                    <DropdownMenu
+                                                        open={openDropdownId === msg._id}
+                                                        onOpenChange={(open) => {
+                                                            setOpenDropdownId(open ? msg._id : null);
+                                                            if (!open) setHoveredId(null);
+                                                        }}
+                                                    >
+                                                        <DropdownMenuTrigger asChild>
+                                                            <button
+                                                                className="px-2 py-1.5 hover:bg-zinc-600 transition-colors text-zinc-400 hover:text-zinc-100 rounded-r-full"
+                                                                title="More options"
                                                             >
-                                                                {isMine && (
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            deleteMessage({ messageId: msg._id }).catch(() => { });
-                                                                            setOpenMenuId(null);
-                                                                            setHoveredId(null);
-                                                                        }}
-                                                                        className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                                                                <MoreHorizontal className="w-4 h-4" />
+                                                            </button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent
+                                                            align={isMine ? "end" : "start"}
+                                                            side="top"
+                                                            className="w-44 bg-zinc-900 border-white/10 text-zinc-100"
+                                                        >
+                                                            <DropdownMenuItem
+                                                                onClick={() => handleReply(msg)}
+                                                                className="gap-2.5 cursor-pointer focus:bg-zinc-800 focus:text-zinc-100"
+                                                            >
+                                                                <Reply className="w-3.5 h-3.5 text-zinc-400" />
+                                                                Reply
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                onClick={() => handleForward(msg)}
+                                                                className="gap-2.5 cursor-pointer focus:bg-zinc-800 focus:text-zinc-100"
+                                                            >
+                                                                <Forward className="w-3.5 h-3.5 text-zinc-400" />
+                                                                Forward
+                                                            </DropdownMenuItem>
+                                                            {isMine && (
+                                                                <>
+                                                                    <DropdownMenuSeparator className="bg-white/10" />
+                                                                    <DropdownMenuItem
+                                                                        variant="destructive"
+                                                                        onClick={() => setDeleteTarget({ id: msg._id })}
+                                                                        className="gap-2.5 cursor-pointer"
                                                                     >
                                                                         <Trash2 className="w-3.5 h-3.5" />
-                                                                        Delete message
-                                                                    </button>
-                                                                )}
-                                                                {!isMine && (
-                                                                    <div className="px-3 py-2.5 text-xs text-zinc-500">No actions available</div>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                                        Delete
+                                                                    </DropdownMenuItem>
+                                                                </>
+                                                            )}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </div>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {/* Typing indicator */}
+                            {typingMembers && typingMembers.length > 0 && (
+                                <div className="flex items-end gap-2 justify-start mt-1">
+                                    <div className="w-8 shrink-0">
+                                        <Avatar className="h-8 w-8 border border-zinc-800">
+                                            <AvatarImage src={(typingMembers[0] as any)?.imageUrl} />
+                                            <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
+                                                {(typingMembers[0] as any)?.name?.charAt(0) || "U"}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                    </div>
+                                    <div className="bg-zinc-800 border border-white/5 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1 shadow-sm">
+                                        <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                        <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                        <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
                                     </div>
                                 </div>
-                            );
-                        })}
-
-                        {/* Typing indicator */}
-                        {typingMembers && typingMembers.length > 0 && (
-                            <div className="flex items-end gap-2 justify-start mt-1">
-                                <div className="w-8 shrink-0">
-                                    <Avatar className="h-8 w-8 border border-zinc-800">
-                                        <AvatarImage src={(typingMembers[0] as any)?.imageUrl} />
-                                        <AvatarFallback className="bg-zinc-800 text-[10px] text-zinc-400">
-                                            {(typingMembers[0] as any)?.name?.charAt(0) || "U"}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                </div>
-                                <div className="bg-zinc-800 border border-white/5 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1 shadow-sm">
-                                    <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                    <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                    <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
-                                </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
                 </div>
+
+                {/* Scroll-to-bottom */}
+                {showScrollButton && (
+                    <button
+                        onClick={scrollToBottom}
+                        className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-zinc-800 border border-white/10 hover:bg-zinc-700 text-white rounded-full px-4 py-2 text-xs font-medium shadow-lg flex items-center gap-1.5 transition-all z-10"
+                    >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                        New messages
+                    </button>
+                )}
             </div>
 
-            {/* Scroll-to-bottom button */}
-            {showScrollButton && (
-                <button
-                    onClick={scrollToBottom}
-                    className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-zinc-800 border border-white/10 hover:bg-zinc-700 text-white rounded-full px-4 py-2 text-xs font-medium shadow-lg flex items-center gap-1.5 transition-all z-10"
-                >
-                    <ArrowDown className="w-3.5 h-3.5" />
-                    New messages
-                </button>
-            )}
-        </div>
+            {/* Delete confirmation — shadcn Dialog */}
+            <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+                <DialogContent className="bg-zinc-900 border-white/10 text-zinc-100 max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-zinc-100">
+                            <div className="p-1.5 bg-red-500/10 rounded-full">
+                                <Trash2 className="w-4 h-4 text-red-400" />
+                            </div>
+                            Delete message?
+                        </DialogTitle>
+                        <DialogDescription className="text-zinc-400">
+                            This action cannot be undone. The message will be permanently removed.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => setDeleteTarget(null)}
+                            disabled={isDeleting}
+                            className="bg-transparent border-white/10 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDeleteConfirm}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? "Deleting..." : "Delete"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }

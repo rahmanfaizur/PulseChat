@@ -31,6 +31,7 @@ export default defineSchema({
         senderId: v.id("users"),
         content: v.string(),
         isDeleted: v.boolean(),
+        replyToId: v.optional(v.id("messages")),
     }).index("by_conversationId", ["conversationId"]),
 
     reactions: defineTable({

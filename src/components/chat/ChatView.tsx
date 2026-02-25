@@ -7,13 +7,20 @@ import ChatHeader from "./ChatHeader";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useUser } from "@clerk/nextjs";
+import { useState } from "react";
+
+// Reply context passed between MessageList → ChatView → MessageInput
+export interface ReplyContext {
+    messageId: Id<"messages">;
+    senderName: string;
+    content: string;
+}
 
 export default function ChatView({ conversationId }: { conversationId: Id<"conversations"> }) {
-    const { user } = useUser();
     const conversations = useQuery(api.conversations.getMyConversations);
+    const [replyTo, setReplyTo] = useState<ReplyContext | null>(null);
 
-    if (conversations === undefined || !user) {
+    if (conversations === undefined) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center p-8 bg-zinc-950/80">
                 <Skeleton className="w-16 h-16 rounded-full bg-zinc-800 mb-4" />
@@ -23,7 +30,7 @@ export default function ChatView({ conversationId }: { conversationId: Id<"conve
         );
     }
 
-    const conversation = conversations.find((c) => c._id === conversationId);
+    const conversation = conversations.find((c: any) => c._id === conversationId);
 
     if (!conversation) {
         return (
@@ -33,17 +40,23 @@ export default function ChatView({ conversationId }: { conversationId: Id<"conve
         );
     }
 
-    // Derive title from members for 1-on-1s
-    const otherMember = conversation.otherMembers[0];
-    const title = conversation.isGroup ? conversation.name : otherMember?.name || "Unknown User";
-    const imageUrl = conversation.isGroup ? "" : otherMember?.imageUrl;
-    const isOnline = conversation.isGroup ? false : otherMember?.isOnline;
+    const otherMember = (conversation as any).otherMembers[0];
+    const title = (conversation as any).isGroup ? (conversation as any).name : otherMember?.name || "Unknown User";
+    const imageUrl = (conversation as any).isGroup ? "" : otherMember?.imageUrl;
+    const isOnline = (conversation as any).isGroup ? false : otherMember?.isOnline;
 
     return (
         <div className="flex-1 flex flex-col bg-zinc-950/80 relative overflow-hidden">
             <ChatHeader name={title} imageUrl={imageUrl} isOnline={isOnline} />
-            <MessageList conversationId={conversationId} />
-            <MessageInput conversationId={conversationId} />
+            <MessageList
+                conversationId={conversationId}
+                onReply={setReplyTo}
+            />
+            <MessageInput
+                conversationId={conversationId}
+                replyTo={replyTo}
+                onCancelReply={() => setReplyTo(null)}
+            />
         </div>
     );
 }
