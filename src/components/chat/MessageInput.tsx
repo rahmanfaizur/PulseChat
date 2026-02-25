@@ -25,6 +25,13 @@ export default function MessageInput({ conversationId, replyTo, onCancelReply }:
     const lastTyped = useRef(0);
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    // Re-focus whenever isSending transitions back to false
+    useEffect(() => {
+        if (!isSending) {
+            inputRef.current?.focus();
+        }
+    }, [isSending]);
+
     useEffect(() => {
         return () => {
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -68,6 +75,8 @@ export default function MessageInput({ conversationId, replyTo, onCancelReply }:
         const replyToId = replyTo?.messageId;
         setContent("");
         onCancelReply();
+        // Focus immediately (synchronous, same click event) before any await
+        inputRef.current?.focus();
 
         try {
             await Promise.all([
@@ -80,6 +89,8 @@ export default function MessageInput({ conversationId, replyTo, onCancelReply }:
             setContent(text);
         } finally {
             setIsSending(false);
+            // Also focus in finally as safety net after async completes
+            inputRef.current?.focus();
         }
     };
 
