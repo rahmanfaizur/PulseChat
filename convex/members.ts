@@ -27,9 +27,9 @@ export const setTyping = mutation({
 
         if (!membership) throw new Error("Not a member of this conversation");
 
-        // set typingUntil to 8 seconds from now
+        // set typingUntil to 3 seconds from now
         await ctx.db.patch(membership._id, {
-            typingUntil: Date.now() + 8000,
+            typingUntil: Date.now() + 3000,
         });
     },
 });

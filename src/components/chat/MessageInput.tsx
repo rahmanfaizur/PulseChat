@@ -56,7 +56,7 @@ export default function MessageInput({ conversationId, replyTo, onCancelReply }:
         typingTimeoutRef.current = setTimeout(() => {
             clearTyping({ conversationId }).catch(() => { });
             lastTyped.current = 0;
-        }, 7000);
+        }, 2500);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {

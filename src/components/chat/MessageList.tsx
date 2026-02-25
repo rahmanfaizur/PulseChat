@@ -327,7 +327,7 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
 
                             {/* Typing indicator */}
                             {typingMembers && typingMembers.length > 0 && (
-                                <div className="flex items-end gap-2 justify-start mt-1">
+                                <div className="flex items-end gap-2 justify-start mt-1 animate-in fade-in slide-in-from-bottom-2 duration-200">
                                     <div className="w-8 shrink-0">
                                         <Avatar className="h-8 w-8 border border-zinc-800">
                                             <AvatarImage src={(typingMembers[0] as any)?.imageUrl} />
@@ -336,10 +336,19 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
                                             </AvatarFallback>
                                         </Avatar>
                                     </div>
-                                    <div className="bg-zinc-800 border border-white/5 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1 shadow-sm">
-                                        <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                        <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                        <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
+                                    <div className="flex flex-col items-start gap-0.5">
+                                        <span className="text-[10px] text-zinc-500 px-1">
+                                            {typingMembers.length === 1
+                                                ? `${(typingMembers[0] as any)?.name?.split(" ")[0] || "Someone"} is typing`
+                                                : typingMembers.length === 2
+                                                    ? `${(typingMembers[0] as any)?.name?.split(" ")[0]} and ${(typingMembers[1] as any)?.name?.split(" ")[0]} are typing`
+                                                    : "Several people are typing"}
+                                        </span>
+                                        <div className="bg-zinc-800 border border-white/5 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5 shadow-sm">
+                                            <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce [animation-delay:-0.32s]"></span>
+                                            <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce [animation-delay:-0.16s]"></span>
+                                            <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce"></span>
+                                        </div>
                                     </div>
                                 </div>
                             )}
