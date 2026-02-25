@@ -5,7 +5,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ c
     const { conversationId } = await params;
 
     return (
-        <div className="h-full w-full group chat-active flex flex-col">
+        <div className="flex-1 overflow-hidden w-full group chat-active flex flex-col">
             <ChatView conversationId={conversationId as Id<"conversations">} />
         </div>
     );

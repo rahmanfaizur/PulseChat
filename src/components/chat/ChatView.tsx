@@ -40,7 +40,7 @@ export default function ChatView({ conversationId }: { conversationId: Id<"conve
     const isOnline = conversation.isGroup ? false : otherMember?.isOnline;
 
     return (
-        <div className="flex-1 flex flex-col bg-zinc-950/80 relative">
+        <div className="flex-1 flex flex-col bg-zinc-950/80 relative overflow-hidden">
             <ChatHeader name={title} imageUrl={imageUrl} isOnline={isOnline} />
             <MessageList conversationId={conversationId} />
             <MessageInput conversationId={conversationId} />
