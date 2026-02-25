@@ -65,8 +65,8 @@ export default function MessageList({ conversationId }: MessageListProps) {
     return (
         <div className="flex-1 flex flex-col overflow-hidden relative">
             <ScrollArea className="flex-1 p-4" viewportRef={scrollRef} onScroll={handleScroll}>
-                <div className="flex flex-col justify-end min-h-full">
-                    <div className="max-w-4xl mx-auto w-full space-y-6 pb-2 mt-auto">
+                <div className="flex flex-col justify-end min-h-full h-full">
+                    <div className="max-w-4xl mx-auto w-full space-y-6 pb-2 pt-4 mt-auto">
                         {messages.map((msg: any, index: number) => {
                             const isMine = msg.isMine;
                             const showAvatar = !isMine && (index === messages.length - 1 || messages[index + 1]?.senderId !== msg.senderId);
