@@ -7,7 +7,7 @@ import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEffect, useRef, useCallback, useState } from "react";
+import React, { useEffect, useRef, useCallback, useState } from "react";
 import { formatTimestamp } from "@/lib/utils";
 import { ArrowDown, MoreHorizontal, Trash2, Reply, Forward, SmilePlus, X, MessageSquare } from "lucide-react";
 import { ReplyContext } from "./ChatView";
@@ -39,11 +39,12 @@ import { Button } from "@/components/ui/button";
 interface MessageListProps {
     conversationId: Id<"conversations">;
     onReply: (ctx: ReplyContext) => void;
+    initialUnreadCount?: number;
 }
 
 const EMOJIS = ["👍", "❤️", "😂", "😮", "😢"];
 
-export default function MessageList({ conversationId, onReply }: MessageListProps) {
+export default function MessageList({ conversationId, onReply, initialUnreadCount = 0 }: MessageListProps) {
     const messages = useQuery(api.messages.getMessages, { conversationId });
     const typingMembers = useQuery(api.members.getTypingMembers, { conversationId });
     const markAsRead = useMutation(api.members.markAsRead);
@@ -58,6 +59,7 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
     const prevInnerHeight = useRef<number | null>(null);
 
     const [showScrollButton, setShowScrollButton] = useState(false);
+    const [hasScrolledToUnread, setHasScrolledToUnread] = useState(false);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
     const [highlightedId, setHighlightedId] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<{ id: string; } | null>(null);
@@ -86,6 +88,21 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
         const outer = scrollRef.current;
         const inner = innerRef.current;
         if (!outer || !inner) return;
+
+        // Auto-scroll to "New Messages" if available
+        if (initialUnreadCount > 0 && !hasScrolledToUnread) {
+            const indicator = document.getElementById("new-messages-indicator");
+            if (indicator) {
+                const outerRect = outer.getBoundingClientRect();
+                const indicatorRect = indicator.getBoundingClientRect();
+                const scrollTop = outer.scrollTop + (indicatorRect.top - outerRect.top) - 60;
+                outer.scrollTo({ top: Math.max(0, scrollTop), behavior: "auto" });
+                setHasScrolledToUnread(true);
+                prevInnerHeight.current = inner.clientHeight;
+                return;
+            }
+        }
+
         const outerH = outer.clientHeight;
         const innerH = inner.clientHeight;
         const scrollTop = outer.scrollTop;
@@ -97,13 +114,14 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
             setShowScrollButton(true);
         }
         prevInnerHeight.current = innerH;
-    }, [messages, typingMembers]);
+    }, [messages, typingMembers, initialUnreadCount, hasScrolledToUnread]);
 
     useEffect(() => {
         prevInnerHeight.current = null;
         setShowScrollButton(false);
         setHoveredId(null);
         setDeleteTarget(null);
+        setHasScrolledToUnread(false);
     }, [conversationId]);
 
     const scrollToBottom = useCallback(() => {
@@ -204,232 +222,241 @@ export default function MessageList({ conversationId, onReply }: MessageListProp
                     <div ref={innerRef} className="py-6">
                         <div className="mx-auto w-full flex flex-col">
                             {messages.map((msg: any, index: number) => {
+                                const isFirstUnread = initialUnreadCount > 0 && index === messages.length - initialUnreadCount;
                                 const isMine = msg.isMine;
                                 const isHovered = hoveredId === msg._id;
-                                const isNewGroup = index === 0 || messages[index - 1]?.senderId !== msg.senderId;
+                                const isNewGroup = index === 0 || (!isFirstUnread && messages[index - 1]?.senderId !== msg.senderId);
                                 const showAvatar = isNewGroup;
                                 const showName = isNewGroup;
 
                                 return (
-                                    <div
-                                        key={msg._id}
-                                        id={`msg-${msg._id}`}
-                                        className={`group flex items-start gap-4 px-6 py-1 hover:bg-white/[0.03] transition-colors relative ${showAvatar ? "mt-5" : ""} ${highlightedId === msg._id ? "bg-violet-500/10 !bg-violet-500/10" : ""}`}
-                                        onMouseEnter={() => setHoveredId(msg._id)}
-                                        onMouseLeave={() => setHoveredId(null)}
-                                    >
-                                        {/* Avatar */}
-                                        <div className="w-10 shrink-0 flex justify-center mt-0.5 relative z-10">
-                                            {showAvatar ? (
-                                                <div className="relative">
-                                                    <Avatar className="h-10 w-10 border border-white/5 shadow-md">
-                                                        <AvatarImage src={msg.sender?.imageUrl} alt={msg.sender?.name || ""} />
-                                                        <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-fuchsia-600 text-sm font-medium text-white">
-                                                            {msg.sender?.name?.charAt(0) || "U"}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    {msg.sender?.isOnline && (
-                                                        <span className="absolute bottom-0 right-0 flex h-3.5 w-3.5">
-                                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                                            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-[2.5px] border-[#09050d]"></span>
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <span className="text-[10px] text-zinc-500 opacity-0 group-hover:opacity-100 select-none pt-1 transition-opacity">
-                                                    {new Date(msg._creationTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    <React.Fragment key={msg._id}>
+                                        {isFirstUnread && (
+                                            <div id="new-messages-indicator" className="flex justify-end mt-4 mb-2 pr-6 animate-in fade-in duration-500">
+                                                <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest bg-red-500/10 px-2.5 py-1 rounded-full border border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+                                                    New Messages
                                                 </span>
-                                            )}
-                                        </div>
-
-                                        {/* Message Content */}
-                                        <div className="flex flex-col min-w-0 flex-1 relative group/content">
-                                            {showName && (
-                                                <div className="flex items-baseline gap-2 mb-1">
-                                                    <span className={`text-[15px] font-semibold tracking-wide ${isMine ? "text-indigo-300" : "bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-violet-400"}`}>
-                                                        {msg.sender?.name}
+                                            </div>
+                                        )}
+                                        <div
+                                            id={`msg-${msg._id}`}
+                                            className={`group flex items-start gap-4 px-6 py-1 hover:bg-white/[0.03] transition-colors relative ${(showAvatar && !isFirstUnread) ? "mt-5" : ""} ${highlightedId === msg._id ? "bg-violet-500/10 !bg-violet-500/10" : ""}`}
+                                            onMouseEnter={() => setHoveredId(msg._id)}
+                                            onMouseLeave={() => setHoveredId(null)}
+                                        >
+                                            {/* Avatar */}
+                                            <div className="w-10 shrink-0 flex justify-center mt-0.5 relative z-10">
+                                                {showAvatar ? (
+                                                    <div className="relative">
+                                                        <Avatar className="h-10 w-10 border border-white/5 shadow-md">
+                                                            <AvatarImage src={msg.sender?.imageUrl} alt={msg.sender?.name || ""} />
+                                                            <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-fuchsia-600 text-sm font-medium text-white">
+                                                                {msg.sender?.name?.charAt(0) || "U"}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                        {msg.sender?.isOnline && (
+                                                            <span className="absolute bottom-0 right-0 flex h-3.5 w-3.5">
+                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-[2.5px] border-[#09050d]"></span>
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[10px] text-zinc-500 opacity-0 group-hover:opacity-100 select-none pt-1 transition-opacity">
+                                                        {new Date(msg._creationTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     </span>
-                                                    <span className="text-[11px] text-white/30 font-medium">
-                                                        {formatTimestamp(msg._creationTime)}
-                                                    </span>
-                                                </div>
-                                            )}
-
-                                            {/* Reply preview */}
-                                            {msg.replyTo && (
-                                                <div
-                                                    className="mb-1.5 flex items-center gap-2 cursor-pointer text-white/40 hover:text-white/70 transition-colors group/reply"
-                                                    onClick={() => {
-                                                        const el = document.getElementById(`msg-${msg.replyTo.messageId}`);
-                                                        if (el) {
-                                                            el.scrollIntoView({ behavior: "smooth", block: "center" });
-                                                            setHighlightedId(msg.replyTo.messageId);
-                                                            setTimeout(() => setHighlightedId(null), 1800);
-                                                        }
-                                                    }}
-                                                >
-                                                    <div className="w-8 border-t-2 border-l-2 border-white/10 rounded-tl-xl h-5 absolute -left-[38px] top-2" />
-                                                    <Avatar className="h-5 w-5 border border-white/10 shrink-0">
-                                                        <AvatarImage src={msg.replyTo.senderImageUrl} />
-                                                        <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-fuchsia-600 text-[9px] text-white">
-                                                            {msg.replyTo.senderName?.charAt(0) || "U"}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <span className="text-xs font-semibold text-violet-300/70 group-hover/reply:text-violet-300 transition-colors">{msg.replyTo.senderName}</span>
-                                                    <span className="text-xs truncate max-w-sm">{msg.replyTo.content}</span>
-                                                </div>
-                                            )}
-
-                                            <div className="text-zinc-200">
-                                                <p className={`whitespace-pre-wrap break-words leading-relaxed text-[15px] ${msg.isDeleted ? "italic opacity-40 text-sm" : ""}`}>
-                                                    {msg.content}
-                                                </p>
+                                                )}
                                             </div>
 
-                                            {/* Reactions */}
-                                            {msg.reactions && msg.reactions.length > 0 && (
-                                                <TooltipProvider delayDuration={300}>
-                                                    <div className="flex flex-wrap gap-1.5 mt-2 justify-start">
-                                                        {msg.reactions.map(({ emoji, users, userIds }: { emoji: string; users: any[]; userIds: any[] }) => {
-                                                            const safeUsers = users ?? [];
-                                                            const hasReacted = safeUsers.some(u => u.clerkId === user?.id);
-                                                            const participantNames = safeUsers.map(u => u.name?.split(" ")[0]).join(", ");
-                                                            return (
-                                                                <Tooltip key={emoji}>
-                                                                    <TooltipTrigger asChild>
-                                                                        <button
-                                                                            onClick={() => {
-                                                                                setReactionsModalMsgId(msg._id);
-                                                                                setActiveReactionTab(emoji);
-                                                                            }}
-                                                                            className={`px-2 py-0.5 rounded-lg text-[13px] font-medium flex items-center gap-1.5 border transition-all ${hasReacted
-                                                                                ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300 shadow-sm"
-                                                                                : "bg-white/5 border-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200"
-                                                                                }`}
-                                                                        >
-                                                                            <span>{emoji}</span>
-                                                                            <span className="text-[11px] leading-none font-bold">{userIds.length}</span>
-                                                                        </button>
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent className="bg-zinc-950 border border-white/10 text-zinc-300 text-xs px-2.5 py-1.5 flex items-center gap-2 rounded-lg shadow-xl shadow-black/50">
-                                                                        <span className="text-lg leading-none">{emoji}</span>
-                                                                        <span>
-                                                                            <span className="font-medium text-white">{participantNames}</span> reacted
-                                                                        </span>
-                                                                    </TooltipContent>
-                                                                </Tooltip>
-                                                            );
-                                                        })}
+                                            {/* Message Content */}
+                                            <div className="flex flex-col min-w-0 flex-1 relative group/content">
+                                                {showName && (
+                                                    <div className="flex items-baseline gap-2 mb-1">
+                                                        <span className={`text-[15px] font-semibold tracking-wide ${isMine ? "text-indigo-300" : "bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-violet-400"}`}>
+                                                            {msg.sender?.name}
+                                                        </span>
+                                                        <span className="text-[11px] text-white/30 font-medium">
+                                                            {formatTimestamp(msg._creationTime)}
+                                                        </span>
                                                     </div>
-                                                </TooltipProvider>
-                                            )}
+                                                )}
 
-                                            {/* Hover action toolbar */}
-                                            {(isHovered || openDropdownId === msg._id) && !msg.isDeleted && (
-                                                <div className="absolute right-4 -top-3 z-20 flex items-center shrink-0 bg-zinc-800/90 backdrop-blur-md rounded-lg shadow-md border border-white/10 overflow-hidden">
-                                                    {EMOJIS.map((emoji) => (
-                                                        <button
-                                                            key={emoji}
-                                                            onClick={() => toggleReaction({ messageId: msg._id, reaction: emoji }).catch(() => { })}
-                                                            className="px-2 py-1.5 hover:bg-white/10 transition-colors text-[14px]"
-                                                            title={emoji}
-                                                        >
-                                                            {emoji}
-                                                        </button>
-                                                    ))}
-                                                    <span className="w-px h-4 bg-white/10 mx-0.5" />
-                                                    <button
-                                                        onClick={() => handleReply(msg)}
-                                                        className="px-2 py-1.5 hover:bg-white/10 transition-colors text-zinc-400 hover:text-zinc-100"
-                                                        title="Reply"
-                                                    >
-                                                        <Reply className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleForward(msg)}
-                                                        className="px-2 py-1.5 hover:bg-white/10 transition-colors text-zinc-400 hover:text-zinc-100"
-                                                        title="Forward"
-                                                    >
-                                                        <Forward className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <span className="w-px h-4 bg-white/10 mx-0.5" />
-                                                    <DropdownMenu
-                                                        open={openDropdownId === msg._id}
-                                                        onOpenChange={(open) => {
-                                                            setOpenDropdownId(open ? msg._id : null);
-                                                            if (!open) setHoveredId(null);
+                                                {/* Reply preview */}
+                                                {msg.replyTo && (
+                                                    <div
+                                                        className="mb-1.5 flex items-center gap-2 cursor-pointer text-white/40 hover:text-white/70 transition-colors group/reply"
+                                                        onClick={() => {
+                                                            const el = document.getElementById(`msg-${msg.replyTo.messageId}`);
+                                                            if (el) {
+                                                                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                                                                setHighlightedId(msg.replyTo.messageId);
+                                                                setTimeout(() => setHighlightedId(null), 1800);
+                                                            }
                                                         }}
                                                     >
-                                                        <DropdownMenuTrigger asChild>
+                                                        <div className="w-8 border-t-2 border-l-2 border-white/10 rounded-tl-xl h-5 absolute -left-[38px] top-2" />
+                                                        <Avatar className="h-5 w-5 border border-white/10 shrink-0">
+                                                            <AvatarImage src={msg.replyTo.senderImageUrl} />
+                                                            <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-fuchsia-600 text-[9px] text-white">
+                                                                {msg.replyTo.senderName?.charAt(0) || "U"}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                        <span className="text-xs font-semibold text-violet-300/70 group-hover/reply:text-violet-300 transition-colors">{msg.replyTo.senderName}</span>
+                                                        <span className="text-xs truncate max-w-sm">{msg.replyTo.content}</span>
+                                                    </div>
+                                                )}
+
+                                                <div className="text-zinc-200">
+                                                    <p className={`whitespace-pre-wrap break-words leading-relaxed text-[15px] ${msg.isDeleted ? "italic opacity-40 text-sm" : ""}`}>
+                                                        {msg.content}
+                                                    </p>
+                                                </div>
+
+                                                {/* Reactions */}
+                                                {msg.reactions && msg.reactions.length > 0 && (
+                                                    <TooltipProvider delayDuration={300}>
+                                                        <div className="flex flex-wrap gap-1.5 mt-2 justify-start">
+                                                            {msg.reactions.map(({ emoji, users, userIds }: { emoji: string; users: any[]; userIds: any[] }) => {
+                                                                const safeUsers = users ?? [];
+                                                                const hasReacted = safeUsers.some(u => u.clerkId === user?.id);
+                                                                const participantNames = safeUsers.map(u => u.name?.split(" ")[0]).join(", ");
+                                                                return (
+                                                                    <Tooltip key={emoji}>
+                                                                        <TooltipTrigger asChild>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setReactionsModalMsgId(msg._id);
+                                                                                    setActiveReactionTab(emoji);
+                                                                                }}
+                                                                                className={`px-2 py-0.5 rounded-lg text-[13px] font-medium flex items-center gap-1.5 border transition-all ${hasReacted
+                                                                                    ? "bg-indigo-500/20 border-indigo-400/30 text-indigo-300 shadow-sm"
+                                                                                    : "bg-white/5 border-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200"
+                                                                                    }`}
+                                                                            >
+                                                                                <span>{emoji}</span>
+                                                                                <span className="text-[11px] leading-none font-bold">{userIds.length}</span>
+                                                                            </button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent className="bg-zinc-950 border border-white/10 text-zinc-300 text-xs px-2.5 py-1.5 flex items-center gap-2 rounded-lg shadow-xl shadow-black/50">
+                                                                            <span className="text-lg leading-none">{emoji}</span>
+                                                                            <span>
+                                                                                <span className="font-medium text-white">{participantNames}</span> reacted
+                                                                            </span>
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </TooltipProvider>
+                                                )}
+
+                                                {/* Hover action toolbar */}
+                                                {(isHovered || openDropdownId === msg._id) && !msg.isDeleted && (
+                                                    <div className="absolute right-4 -top-3 z-20 flex items-center shrink-0 bg-zinc-800/90 backdrop-blur-md rounded-lg shadow-md border border-white/10 overflow-hidden">
+                                                        {EMOJIS.map((emoji) => (
                                                             <button
-                                                                className="px-2 py-1.5 hover:bg-white/10 transition-colors text-zinc-400 hover:text-zinc-100"
-                                                                title="More options"
+                                                                key={emoji}
+                                                                onClick={() => toggleReaction({ messageId: msg._id, reaction: emoji }).catch(() => { })}
+                                                                className="px-2 py-1.5 hover:bg-white/10 transition-colors text-[14px]"
+                                                                title={emoji}
                                                             >
-                                                                <MoreHorizontal className="w-4 h-4" />
+                                                                {emoji}
                                                             </button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent
-                                                            align="end"
-                                                            side="bottom"
-                                                            className="w-44 bg-zinc-900 border-white/10 text-zinc-100"
+                                                        ))}
+                                                        <span className="w-px h-4 bg-white/10 mx-0.5" />
+                                                        <button
+                                                            onClick={() => handleReply(msg)}
+                                                            className="px-2 py-1.5 hover:bg-white/10 transition-colors text-zinc-400 hover:text-zinc-100"
+                                                            title="Reply"
                                                         >
-                                                            <DropdownMenuItem
-                                                                onClick={() => handleReply(msg)}
-                                                                className="gap-2.5 cursor-pointer focus:bg-white/10 focus:text-zinc-100"
+                                                            <Reply className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleForward(msg)}
+                                                            className="px-2 py-1.5 hover:bg-white/10 transition-colors text-zinc-400 hover:text-zinc-100"
+                                                            title="Forward"
+                                                        >
+                                                            <Forward className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <span className="w-px h-4 bg-white/10 mx-0.5" />
+                                                        <DropdownMenu
+                                                            open={openDropdownId === msg._id}
+                                                            onOpenChange={(open) => {
+                                                                setOpenDropdownId(open ? msg._id : null);
+                                                                if (!open) setHoveredId(null);
+                                                            }}
+                                                        >
+                                                            <DropdownMenuTrigger asChild>
+                                                                <button
+                                                                    className="px-2 py-1.5 hover:bg-white/10 transition-colors text-zinc-400 hover:text-zinc-100"
+                                                                    title="More options"
+                                                                >
+                                                                    <MoreHorizontal className="w-4 h-4" />
+                                                                </button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent
+                                                                align="end"
+                                                                side="bottom"
+                                                                className="w-44 bg-zinc-900 border-white/10 text-zinc-100"
                                                             >
-                                                                <Reply className="w-3.5 h-3.5 text-zinc-400" />
-                                                                Reply
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                onClick={() => handleForward(msg)}
-                                                                className="gap-2.5 cursor-pointer focus:bg-white/10 focus:text-zinc-100"
-                                                            >
-                                                                <Forward className="w-3.5 h-3.5 text-zinc-400" />
-                                                                Forward
-                                                            </DropdownMenuItem>
-                                                            {msg.reactions && msg.reactions.length > 0 && (
                                                                 <DropdownMenuItem
-                                                                    onClick={() => {
-                                                                        setReactionsModalMsgId(msg._id);
-                                                                        setActiveReactionTab(msg.reactions[0]?.emoji || null);
-                                                                    }}
+                                                                    onClick={() => handleReply(msg)}
                                                                     className="gap-2.5 cursor-pointer focus:bg-white/10 focus:text-zinc-100"
                                                                 >
-                                                                    <SmilePlus className="w-3.5 h-3.5 text-zinc-400" />
-                                                                    View Reactions
+                                                                    <Reply className="w-3.5 h-3.5 text-zinc-400" />
+                                                                    Reply
                                                                 </DropdownMenuItem>
-                                                            )}
-                                                            {!isMine && (
-                                                                <>
-                                                                    <DropdownMenuSeparator className="bg-white/10" />
+                                                                <DropdownMenuItem
+                                                                    onClick={() => handleForward(msg)}
+                                                                    className="gap-2.5 cursor-pointer focus:bg-white/10 focus:text-zinc-100"
+                                                                >
+                                                                    <Forward className="w-3.5 h-3.5 text-zinc-400" />
+                                                                    Forward
+                                                                </DropdownMenuItem>
+                                                                {msg.reactions && msg.reactions.length > 0 && (
                                                                     <DropdownMenuItem
-                                                                        onClick={() => handleMessageUser(msg.senderId)}
+                                                                        onClick={() => {
+                                                                            setReactionsModalMsgId(msg._id);
+                                                                            setActiveReactionTab(msg.reactions[0]?.emoji || null);
+                                                                        }}
                                                                         className="gap-2.5 cursor-pointer focus:bg-white/10 focus:text-zinc-100"
                                                                     >
-                                                                        <MessageSquare className="w-3.5 h-3.5 text-zinc-400" />
-                                                                        Message User...
+                                                                        <SmilePlus className="w-3.5 h-3.5 text-zinc-400" />
+                                                                        View Reactions
                                                                     </DropdownMenuItem>
-                                                                </>
-                                                            )}
-                                                            {isMine && (
-                                                                <>
-                                                                    <DropdownMenuSeparator className="bg-white/10" />
-                                                                    <DropdownMenuItem
-                                                                        variant="destructive"
-                                                                        onClick={() => setDeleteTarget({ id: msg._id })}
-                                                                        className="gap-2.5 cursor-pointer"
-                                                                    >
-                                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                                        Delete
-                                                                    </DropdownMenuItem>
-                                                                </>
-                                                            )}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            )}
+                                                                )}
+                                                                {!isMine && (
+                                                                    <>
+                                                                        <DropdownMenuSeparator className="bg-white/10" />
+                                                                        <DropdownMenuItem
+                                                                            onClick={() => handleMessageUser(msg.senderId)}
+                                                                            className="gap-2.5 cursor-pointer focus:bg-white/10 focus:text-zinc-100"
+                                                                        >
+                                                                            <MessageSquare className="w-3.5 h-3.5 text-zinc-400" />
+                                                                            Message User...
+                                                                        </DropdownMenuItem>
+                                                                    </>
+                                                                )}
+                                                                {isMine && (
+                                                                    <>
+                                                                        <DropdownMenuSeparator className="bg-white/10" />
+                                                                        <DropdownMenuItem
+                                                                            variant="destructive"
+                                                                            onClick={() => setDeleteTarget({ id: msg._id })}
+                                                                            className="gap-2.5 cursor-pointer"
+                                                                        >
+                                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                                            Delete
+                                                                        </DropdownMenuItem>
+                                                                    </>
+                                                                )}
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
+                                    </React.Fragment>
                                 );
                             })}
 

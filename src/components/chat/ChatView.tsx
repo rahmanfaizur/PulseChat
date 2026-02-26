@@ -27,11 +27,23 @@ export default function ChatView({ conversationId }: { conversationId: Id<"conve
     const router = useRouter();
     const [replyTo, setReplyTo] = useState<ReplyContext | null>(null);
     const [activeMember, setActiveMember] = useState<any | null>(null);
+    const [initialUnreadCount, setInitialUnreadCount] = useState<number>(0);
+
+    // Reset initial unread count when switching conversations
+    useEffect(() => {
+        setInitialUnreadCount(0);
+    }, [conversationId]);
 
     // Eagerly mark as read when conversation is opened or a new message arrives
     // Uses lastMessage already available from sidebar query — no need to wait for MessageList
     useEffect(() => {
         const conversation = conversations?.find((c: any) => c._id === conversationId);
+
+        // Capture initial unread count before it gets cleared
+        if (conversation && initialUnreadCount === 0 && conversation.unreadCount > 0) {
+            setInitialUnreadCount(conversation.unreadCount);
+        }
+
         const lastMsgId = conversation?.lastMessage?._id;
         if (lastMsgId) {
             markAsRead({ conversationId, messageId: lastMsgId }).catch(() => { });
@@ -82,6 +94,7 @@ export default function ChatView({ conversationId }: { conversationId: Id<"conve
                 <MessageList
                     conversationId={conversationId}
                     onReply={setReplyTo}
+                    initialUnreadCount={initialUnreadCount}
                 />
                 <MessageInput
                     conversationId={conversationId}
